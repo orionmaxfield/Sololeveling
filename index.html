@@ -1,0 +1,1012 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Swords, Wind, Heart, Brain, Eye, Plus, Check, Trash2, Trophy,
+  Store, ScrollText, User, Coins, Flame, X, Package, Target,
+  AlertTriangle, ChevronDown, Lock
+} from 'lucide-react';
+
+/* ────────────────────────────────────────────────────────────
+   THE SYSTEM — a personal leveling tracker
+   ──────────────────────────────────────────────────────────── */
+
+const KEY = 'the-system-v1';
+
+const C = {
+  void: '#04070f',
+  deep: '#070d1c',
+  panel: 'rgba(12, 26, 51, 0.72)',
+  line: 'rgba(77, 208, 255, 0.34)',
+  lineSoft: 'rgba(77, 208, 255, 0.14)',
+  cyan: '#4dd0ff',
+  cyanDim: '#7fb4d4',
+  violet: '#a78bfa',
+  amber: '#f5a524',
+  red: '#ff4d6d',
+  green: '#4ade80',
+  text: '#dfefff',
+  mute: '#7d95b5',
+};
+
+const STATS = [
+  { k: 'STR', name: 'Strength', icon: Swords, color: '#ff6b7d', hint: 'Lifting, resistance work, physical effort, hard chores' },
+  { k: 'AGI', name: 'Agility', icon: Wind, color: '#4ade80', hint: 'Walking, running, sport, mobility, getting outside' },
+  { k: 'VIT', name: 'Vitality', icon: Heart, color: '#f5a524', hint: 'Sleep, food, water, rest, appointments kept' },
+  { k: 'INT', name: 'Intelligence', icon: Brain, color: '#4dd0ff', hint: 'Study, reading, skills, budgeting, saving, work on the business' },
+  { k: 'PER', name: 'Perception', icon: Eye, color: '#a78bfa', hint: 'Stillness, prayer, journaling, people you love, self-honesty' },
+];
+const STAT_MAP = Object.fromEntries(STATS.map(s => [s.k, s]));
+
+const RANKS = [
+  { min: 70, r: 'S', c: '#f5a524' },
+  { min: 50, r: 'A', c: '#ff6b7d' },
+  { min: 35, r: 'B', c: '#a78bfa' },
+  { min: 20, r: 'C', c: '#4dd0ff' },
+  { min: 10, r: 'D', c: '#4ade80' },
+  { min: 1, r: 'E', c: '#7d95b5' },
+];
+const rankOf = lvl => RANKS.find(r => lvl >= r.min) || RANKS[RANKS.length - 1];
+
+const DIFF = {
+  E: { xp: 60, p: 30 }, D: { xp: 120, p: 60 }, C: { xp: 220, p: 120 },
+  B: { xp: 400, p: 220 }, A: { xp: 700, p: 400 }, S: { xp: 1200, p: 800 },
+};
+
+const MEDALS = [
+  { id: 'star', name: 'Gold Star', sym: '★', cost: 50, tier: 'Common', color: '#f5d24a', desc: 'The classic. Proof you showed up.' },
+  { id: 'bronze', name: 'Bronze Medal', sym: '◉', cost: 120, tier: 'Common', color: '#c08457', desc: 'Awarded for a week that held together.' },
+  { id: 'shard', name: 'Mana Shard', sym: '◈', cost: 200, tier: 'Uncommon', color: '#4dd0ff', desc: 'A small piece of stored effort.' },
+  { id: 'silver', name: 'Silver Medal', sym: '◉', cost: 300, tier: 'Uncommon', color: '#cbd5e1', desc: 'For finishing something you wanted to quit.' },
+  { id: 'elixir', name: 'Elixir of Life', sym: '⚗', cost: 420, tier: 'Uncommon', color: '#4ade80', desc: 'Recovery, earned rather than borrowed.' },
+  { id: 'gold', name: 'Gold Medal', sym: '◉', cost: 600, tier: 'Rare', color: '#f5a524', desc: 'Top of the podium in your own house.' },
+  { id: 'crest', name: "Knight's Crest", sym: '⛨', cost: 850, tier: 'Rare', color: '#4dd0ff', desc: 'Given to those who keep their word to themselves.' },
+  { id: 'dagger', name: "Hunter's Dagger", sym: '⚔', cost: 1100, tier: 'Rare', color: '#dfefff', desc: 'For the day you went in anyway.' },
+  { id: 'frag', name: 'Shadow Fragment', sym: '✧', cost: 1600, tier: 'Epic', color: '#a78bfa', desc: 'Something you used to fear, now working for you.' },
+  { id: 'key', name: 'Red Gate Key', sym: '⚿', cost: 2200, tier: 'Epic', color: '#ff4d6d', desc: 'Opens the hard thing you have been avoiding.' },
+  { id: 'sigil', name: "Monarch's Sigil", sym: '⬢', cost: 4000, tier: 'Legendary', color: '#e879f9', desc: 'Sovereign over your own schedule.' },
+  { id: 'throne', name: 'Shadow Throne', sym: '♛', cost: 8000, tier: 'Legendary', color: '#f5a524', desc: 'The long game, won.' },
+];
+
+const SEED_DAILIES = [
+  { id: 'd1', title: '20 push-ups', stat: 'STR', mandatory: true, done: false },
+  { id: 'd2', title: 'Walk or run for 15 minutes', stat: 'AGI', mandatory: true, done: false },
+  { id: 'd3', title: 'In bed by a set time', stat: 'VIT', mandatory: true, done: false },
+  { id: 'd4', title: 'Read or study for 20 minutes', stat: 'INT', mandatory: false, done: false },
+  { id: 'd5', title: '5 minutes of stillness', stat: 'PER', mandatory: false, done: false },
+];
+
+const SEED_SHOP = [
+  { id: 's1', name: 'Movie night, no guilt', cost: 200, note: 'Pick anything. Phone stays down.' },
+  { id: 's2', name: 'Meal out at the good place', cost: 500, note: '' },
+  { id: 's3', name: 'A full day off. No quests.', cost: 1200, note: 'Streak protected.' },
+];
+
+/* ── math ───────────────────────────────────────────────── */
+const today = () => new Date().toLocaleDateString('en-CA');
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function progress(xp, base, inc) {
+  let lvl = 1, need = base, rem = Math.max(0, xp);
+  while (rem >= need && lvl < 999) { rem -= need; lvl++; need = base + (lvl - 1) * inc; }
+  return { lvl, rem, need };
+}
+const hunterP = xp => progress(xp, 100, 60);
+const statP = xp => progress(xp, 50, 30);
+
+const DEFAULT = {
+  ready: false, name: '',
+  xp: 0, points: 0, streak: 0, best: 0, strict: false,
+  stats: { STR: 0, AGI: 0, VIT: 0, INT: 0, PER: 0 },
+  dailies: SEED_DAILIES, quests: [], shop: SEED_SHOP, bag: [],
+  lastReset: today(), history: [],
+};
+
+function rollover(d) {
+  const t = today();
+  if (d.lastReset === t) return d;
+  const mand = d.dailies.filter(q => q.mandatory);
+  const cleared = mand.length > 0 && mand.every(q => q.done);
+  const n = { ...d };
+  if (cleared) { n.streak = d.streak + 1; n.best = Math.max(d.best || 0, n.streak); }
+  else if (mand.length > 0) { n.streak = 0; if (d.strict) n.xp = Math.max(0, d.xp - 40); }
+  n.history = [...(d.history || []), {
+    date: d.lastReset,
+    done: d.dailies.filter(q => q.done).length,
+    total: d.dailies.length, cleared,
+  }].slice(-90);
+  n.dailies = d.dailies.map(q => ({ ...q, done: false }));
+  n.lastReset = t;
+  return n;
+}
+
+/* ── shell pieces ───────────────────────────────────────── */
+const cut = (n = 14) =>
+  `polygon(${n}px 0, 100% 0, 100% calc(100% - ${n}px), calc(100% - ${n}px) 100%, 0 100%, 0 ${n}px)`;
+
+function Panel({ children, glow, style, pad = 16 }) {
+  return (
+    <div style={{
+      position: 'relative', background: C.panel, padding: pad,
+      clipPath: cut(14), border: 'none',
+      boxShadow: glow ? `inset 0 0 0 1px ${C.line}, 0 0 26px rgba(77,208,255,.10)` : `inset 0 0 0 1px ${C.lineSoft}`,
+      backdropFilter: 'blur(2px)', ...style,
+    }}>{children}</div>
+  );
+}
+
+function Bar({ value, max, color, height = 7 }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div style={{ height, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+      <div className="sysbar" style={{
+        width: `${pct}%`, height: '100%', background: color,
+        boxShadow: `0 0 10px ${color}`, transition: 'width .55s cubic-bezier(.2,.8,.2,1)',
+      }} />
+    </div>
+  );
+}
+
+function Btn({ children, onClick, tone = 'cyan', small, wide, disabled, title }) {
+  const col = tone === 'danger' ? C.red : tone === 'gold' ? C.amber : tone === 'ghost' ? C.mute : C.cyan;
+  return (
+    <button onClick={onClick} disabled={disabled} title={title} style={{
+      background: disabled ? 'rgba(255,255,255,.04)' : `${col}1c`,
+      color: disabled ? C.mute : col,
+      boxShadow: `inset 0 0 0 1px ${disabled ? 'rgba(255,255,255,.08)' : col + '66'}`,
+      clipPath: cut(8), padding: small ? '7px 12px' : '11px 18px',
+      fontFamily: 'Rajdhani, sans-serif', fontWeight: 600,
+      fontSize: small ? 13 : 15, letterSpacing: '.09em', textTransform: 'uppercase',
+      cursor: disabled ? 'not-allowed' : 'pointer', width: wide ? '100%' : 'auto',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+    }}>{children}</button>
+  );
+}
+
+const Field = props => (
+  <input {...props} style={{
+    width: '100%', background: 'rgba(255,255,255,.05)', color: C.text,
+    boxShadow: `inset 0 0 0 1px ${C.lineSoft}`, border: 'none', outline: 'none',
+    padding: '11px 13px', fontFamily: 'Rajdhani, sans-serif', fontSize: 16,
+    clipPath: cut(7), ...props.style,
+  }} />
+);
+
+const Eyebrow = ({ children, color = C.cyan }) => (
+  <div style={{
+    fontFamily: 'Chakra Petch, monospace', fontSize: 10, letterSpacing: '.3em',
+    color, textTransform: 'uppercase', opacity: .85, marginBottom: 8,
+  }}>{children}</div>
+);
+
+/* ────────────────────────────────────────────────────────── */
+export default function App() {
+  const [d, setD] = useState(null);
+  const [tab, setTab] = useState('status');
+  const [modal, setModal] = useState(null);   // big system window
+  const [toast, setToast] = useState(null);
+  const queue = useRef([]);
+  const [nameIn, setNameIn] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      let loaded = null;
+      try {
+        const r = await window.storage.get(KEY, false);
+        if (r && r.value) loaded = JSON.parse(r.value);
+      } catch (e) { loaded = null; }
+      setD(rollover({ ...DEFAULT, ...(loaded || {}) }));
+    })();
+  }, []);
+
+  const persist = async next => {
+    try { await window.storage.set(KEY, JSON.stringify(next), false); }
+    catch (e) { setToast({ text: 'Could not save. Your last action may be lost.', bad: true }); }
+  };
+
+  const pushModal = m => { queue.current.push(m); if (!modal) setModal(queue.current.shift()); };
+  const nextModal = () => setModal(queue.current.length ? queue.current.shift() : null);
+  const fireToast = t => { setToast(t); setTimeout(() => setToast(null), 2600); };
+
+  // central mutation: applies changes, detects level-ups, saves
+  const apply = mutate => {
+    setD(prev => {
+      const before = { h: hunterP(prev.xp).lvl, s: Object.fromEntries(STATS.map(x => [x.k, statP(prev.stats[x.k]).lvl])) };
+      const next = mutate({ ...prev, stats: { ...prev.stats } });
+      const afterH = hunterP(next.xp).lvl;
+      STATS.forEach(x => {
+        const a = statP(next.stats[x.k]).lvl;
+        if (a > before.s[x.k]) pushModal({ kind: 'stat', stat: x, from: before.s[x.k], to: a });
+      });
+      if (afterH > before.h) {
+        const rb = rankOf(before.h).r, ra = rankOf(afterH).r;
+        pushModal({ kind: 'level', from: before.h, to: afterH, rankUp: ra !== rb ? ra : null });
+      }
+      persist(next);
+      return next;
+    });
+  };
+
+  if (!d) return <Boot />;
+
+  /* ── onboarding ── */
+  if (!d.ready) {
+    return (
+      <Frame>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+          <div style={{ width: '100%', maxWidth: 460 }}>
+            <Panel glow pad={26}>
+              <Eyebrow>Notification</Eyebrow>
+              <h1 style={{
+                fontFamily: 'Chakra Petch, sans-serif', fontSize: 27, lineHeight: 1.15,
+                color: C.text, margin: '0 0 14px', fontWeight: 700,
+              }}>You have acquired the qualifications to be a Player.</h1>
+              <p style={{ color: C.mute, fontFamily: 'Rajdhani, sans-serif', fontSize: 17, lineHeight: 1.5, margin: '0 0 22px' }}>
+                Five stats. Daily quests you write yourself. Points you spend on things you
+                actually want. Nobody else can see this window.
+              </p>
+              <Eyebrow>Enter your name</Eyebrow>
+              <Field value={nameIn} onChange={e => setNameIn(e.target.value)} placeholder="Name" maxLength={22}
+                onKeyDown={e => { if (e.key === 'Enter' && nameIn.trim()) apply(p => ({ ...p, ready: true, name: nameIn.trim() })); }} />
+              <div style={{ height: 16 }} />
+              <Btn wide disabled={!nameIn.trim()} onClick={() => apply(p => ({ ...p, ready: true, name: nameIn.trim() }))}>
+                Accept
+              </Btn>
+            </Panel>
+          </div>
+        </div>
+      </Frame>
+    );
+  }
+
+  const hp = hunterP(d.xp);
+  const rank = rankOf(hp.lvl);
+  const mand = d.dailies.filter(q => q.mandatory);
+  const mandLeft = mand.filter(q => !q.done).length;
+
+  /* ── actions ── */
+  const toggleDaily = id => apply(p => {
+    const q = p.dailies.find(x => x.id === id);
+    if (!q) return p;
+    const on = !q.done;
+    const dl = p.dailies.map(x => x.id === id ? { ...x, done: on } : x);
+    let xp = p.xp + (on ? 15 : -15);
+    let pts = p.points + (on ? 10 : -10);
+    const stats = { ...p.stats, [q.stat]: Math.max(0, p.stats[q.stat] + (on ? 15 : -15)) };
+    // full-clear bonus
+    const allNow = dl.length > 0 && dl.every(x => x.done);
+    const allBefore = p.dailies.length > 0 && p.dailies.every(x => x.done);
+    if (allNow && !allBefore) { xp += 50; pts += 50; fireToast({ text: 'Daily quests cleared. +50 XP  +50 pts' }); }
+    if (!allNow && allBefore) { xp -= 50; pts -= 50; }
+    return { ...p, dailies: dl, xp: Math.max(0, xp), points: Math.max(0, pts), stats };
+  });
+
+  const addDaily = (title, stat, mandatory) =>
+    apply(p => ({ ...p, dailies: [...p.dailies, { id: uid(), title, stat, mandatory, done: false }] }));
+  const delDaily = id => apply(p => ({ ...p, dailies: p.dailies.filter(x => x.id !== id) }));
+  const flipMand = id => apply(p => ({ ...p, dailies: p.dailies.map(x => x.id === id ? { ...x, mandatory: !x.mandatory } : x) }));
+
+  const addQuest = q => apply(p => ({ ...p, quests: [...p.quests, q] }));
+  const delQuest = id => apply(p => ({ ...p, quests: p.quests.filter(x => x.id !== id) }));
+  const stepFlip = (qid, i) => apply(p => ({
+    ...p, quests: p.quests.map(q => q.id !== qid ? q :
+      { ...q, steps: q.steps.map((s, j) => j === i ? { ...s, done: !s.done } : s) })
+  }));
+  const addStep = (qid, t) => apply(p => ({
+    ...p, quests: p.quests.map(q => q.id !== qid ? q : { ...q, steps: [...q.steps, { t, done: false }] })
+  }));
+  const finishQuest = id => apply(p => {
+    const q = p.quests.find(x => x.id === id);
+    if (!q || q.done) return p;
+    const r = DIFF[q.rank];
+    fireToast({ text: `Quest complete. +${r.xp} XP  +${r.p} pts` });
+    return {
+      ...p, xp: p.xp + r.xp, points: p.points + r.p,
+      stats: { ...p.stats, [q.stat]: p.stats[q.stat] + r.xp },
+      quests: p.quests.map(x => x.id === id ? { ...x, done: true, doneAt: today() } : x),
+    };
+  });
+
+  const buy = item => apply(p => {
+    if (p.points < item.cost) return p;
+    fireToast({ text: `Acquired: ${item.name}` });
+    return {
+      ...p, points: p.points - item.cost,
+      bag: [...p.bag, { uid: uid(), refId: item.id, name: item.name, cost: item.cost, sym: item.sym || null, color: item.color || C.cyan, kind: item.sym ? 'medal' : 'reward', at: today(), used: false }],
+    };
+  });
+  const useItem = u => apply(p => ({ ...p, bag: p.bag.map(x => x.uid === u ? { ...x, used: true } : x) }));
+  const sellItem = u => apply(p => {
+    const it = p.bag.find(x => x.uid === u); if (!it) return p;
+    const back = Math.floor(it.cost / 2);
+    fireToast({ text: `Sold. +${back} pts` });
+    return { ...p, points: p.points + back, bag: p.bag.filter(x => x.uid !== u) };
+  });
+  const addReward = (name, cost, note) => apply(p => ({ ...p, shop: [...p.shop, { id: uid(), name, cost, note }] }));
+  const delReward = id => apply(p => ({ ...p, shop: p.shop.filter(x => x.id !== id) }));
+
+  const TABS = [
+    { k: 'status', label: 'Status', icon: User },
+    { k: 'daily', label: 'Daily', icon: Target },
+    { k: 'quests', label: 'Quests', icon: ScrollText },
+    { k: 'shop', label: 'Shop', icon: Store },
+    { k: 'bag', label: 'Bag', icon: Package },
+  ];
+
+  return (
+    <Frame>
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '18px 15px 104px' }}>
+
+        {/* header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+          <div style={{
+            width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center',
+            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+            background: `${rank.c}22`, boxShadow: `0 0 18px ${rank.c}44`,
+            fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 21, color: rank.c,
+          }}>{rank.r}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 18, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, letterSpacing: '.14em' }}>
+              LEVEL {hp.lvl} · RANK {rank.r}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', color: C.amber, fontFamily: 'Chakra Petch, sans-serif', fontSize: 17, fontWeight: 600 }}>
+              <Coins size={15} />{d.points.toLocaleString()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', color: d.streak > 0 ? C.red : C.mute, fontFamily: 'Rajdhani, sans-serif', fontSize: 13 }}>
+              <Flame size={13} />{d.streak} day{d.streak === 1 ? '' : 's'}
+            </div>
+          </div>
+        </div>
+
+        {tab === 'status' && <Status d={d} hp={hp} rank={rank} apply={apply} />}
+        {tab === 'daily' && <Daily d={d} mandLeft={mandLeft} toggle={toggleDaily} add={addDaily} del={delDaily} flip={flipMand} />}
+        {tab === 'quests' && <Quests d={d} add={addQuest} del={delQuest} finish={finishQuest} stepFlip={stepFlip} addStep={addStep} />}
+        {tab === 'shop' && <Shop d={d} buy={buy} addReward={addReward} delReward={delReward} />}
+        {tab === 'bag' && <Bag d={d} useItem={useItem} sellItem={sellItem} />}
+      </div>
+
+      {/* bottom nav */}
+      <nav style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
+        background: 'rgba(4,7,15,.93)', boxShadow: `inset 0 1px 0 ${C.lineSoft}`,
+        backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <div style={{ display: 'flex', width: '100%', maxWidth: 560 }}>
+          {TABS.map(t => {
+            const on = tab === t.k;
+            const I = t.icon;
+            const badge = t.k === 'daily' && mandLeft > 0;
+            return (
+              <button key={t.k} onClick={() => setTab(t.k)} style={{
+                flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+                padding: '11px 0 13px', color: on ? C.cyan : C.mute, position: 'relative',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              }}>
+                {on && <div style={{ position: 'absolute', top: 0, left: '26%', right: '26%', height: 2, background: C.cyan, boxShadow: `0 0 10px ${C.cyan}` }} />}
+                <I size={19} />
+                <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>{t.label}</span>
+                {badge && <span style={{ position: 'absolute', top: 8, right: '26%', width: 7, height: 7, borderRadius: '50%', background: C.red, boxShadow: `0 0 8px ${C.red}` }} />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
+          background: 'rgba(7,13,28,.96)', color: toast.bad ? C.red : C.cyan, padding: '11px 18px',
+          clipPath: cut(9), boxShadow: `inset 0 0 0 1px ${toast.bad ? C.red + '66' : C.line}`,
+          fontFamily: 'Rajdhani, sans-serif', fontSize: 15, letterSpacing: '.04em',
+          maxWidth: '88vw', textAlign: 'center',
+        }}>{toast.text}</div>
+      )}
+
+      {modal && <SystemWindow m={modal} onClose={nextModal} />}
+    </Frame>
+  );
+}
+
+/* ── views ───────────────────────────────────────────────── */
+
+function Status({ d, hp, rank, apply }) {
+  const cleared = (d.history || []).filter(h => h.cleared).length;
+  return (
+    <>
+      <Panel glow>
+        <Eyebrow>Status</Eyebrow>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+          <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 15, color: C.text, letterSpacing: '.06em' }}>EXPERIENCE</span>
+          <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 14, color: C.mute }}>{hp.rem} / {hp.need}</span>
+        </div>
+        <Bar value={hp.rem} max={hp.need} color={C.cyan} height={9} />
+        <div style={{ marginTop: 20, display: 'grid', gap: 14 }}>
+          {STATS.map(s => {
+            const p = statP(d.stats[s.k]);
+            const I = s.icon;
+            return (
+              <div key={s.k}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
+                  <I size={15} color={s.color} />
+                  <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 13, letterSpacing: '.16em', color: C.text, width: 38 }}>{s.k}</span>
+                  <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 14, color: C.mute, flex: 1 }}>{s.name}</span>
+                  <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 16, color: s.color, fontWeight: 600 }}>{p.lvl}</span>
+                </div>
+                <Bar value={p.rem} max={p.need} color={s.color} />
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <div style={{ height: 14 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        {[
+          { l: 'Best streak', v: d.best || 0 },
+          { l: 'Days cleared', v: cleared },
+          { l: 'Quests done', v: d.quests.filter(q => q.done).length },
+        ].map(x => (
+          <Panel key={x.l} pad={13}>
+            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 23, color: C.text }}>{x.v}</div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11.5, color: C.mute, letterSpacing: '.09em', textTransform: 'uppercase', marginTop: 2 }}>{x.l}</div>
+          </Panel>
+        ))}
+      </div>
+
+      <div style={{ height: 14 }} />
+      <Panel>
+        <Eyebrow>Last 14 days</Eyebrow>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 44 }}>
+          {Array.from({ length: 14 }).map((_, i) => {
+            const h = (d.history || []).slice(-14)[i];
+            const ratio = h && h.total ? h.done / h.total : 0;
+            return (
+              <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{
+                  width: '100%', height: `${Math.max(6, ratio * 100)}%`,
+                  background: !h ? 'rgba(255,255,255,.06)' : h.cleared ? C.cyan : C.mute,
+                  boxShadow: h && h.cleared ? `0 0 8px ${C.cyan}` : 'none',
+                }} />
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <div style={{ height: 14 }} />
+      <Panel pad={14}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer' }}>
+          <input type="checkbox" checked={d.strict} onChange={() => apply(p => ({ ...p, strict: !p.strict }))}
+            style={{ width: 17, height: 17, accentColor: C.red }} />
+          <div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text }}>Penalty mode</div>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, lineHeight: 1.35 }}>
+              Miss a mandatory quest and lose 40 XP on top of the streak. Off by default — a broken streak is
+              usually feedback enough.
+            </div>
+          </div>
+        </label>
+      </Panel>
+    </>
+  );
+}
+
+function Daily({ d, mandLeft, toggle, add, del, flip }) {
+  const [open, setOpen] = useState(false);
+  const [t, setT] = useState(''); const [s, setS] = useState('STR'); const [m, setM] = useState(false);
+  const submit = () => { if (!t.trim()) return; add(t.trim(), s, m); setT(''); setM(false); setOpen(false); };
+  const doneCount = d.dailies.filter(q => q.done).length;
+
+  return (
+    <>
+      <Panel glow>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <Eyebrow color={mandLeft ? C.red : C.green}>Daily Quest — {mandLeft ? 'Incomplete' : 'Complete'}</Eyebrow>
+            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 19, color: C.text }}>
+              {doneCount} / {d.dailies.length} finished
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute }}>
+            Resets<br />at midnight
+          </div>
+        </div>
+        {mandLeft > 0 && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, color: C.amber, fontFamily: 'Rajdhani, sans-serif', fontSize: 14 }}>
+            <AlertTriangle size={15} />
+            {mandLeft} required quest{mandLeft === 1 ? '' : 's'} left to keep the streak.
+          </div>
+        )}
+      </Panel>
+
+      <div style={{ height: 14 }} />
+      <div style={{ display: 'grid', gap: 9 }}>
+        {d.dailies.map(q => {
+          const st = STAT_MAP[q.stat];
+          const I = st.icon;
+          return (
+            <Panel key={q.id} pad={0}>
+              <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                <button onClick={() => toggle(q.id)} style={{
+                  width: 52, background: q.done ? `${C.cyan}1e` : 'transparent', border: 'none',
+                  cursor: 'pointer', display: 'grid', placeItems: 'center', color: q.done ? C.cyan : C.mute,
+                  boxShadow: `inset -1px 0 0 ${C.lineSoft}`,
+                }}>
+                  <div style={{
+                    width: 21, height: 21, display: 'grid', placeItems: 'center',
+                    boxShadow: `inset 0 0 0 1.5px ${q.done ? C.cyan : 'rgba(255,255,255,.22)'}`,
+                    clipPath: cut(5), background: q.done ? `${C.cyan}33` : 'transparent',
+                  }}>{q.done && <Check size={13} />}</div>
+                </button>
+                <div style={{ flex: 1, padding: '12px 12px', minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: 'Rajdhani, sans-serif', fontSize: 16.5, lineHeight: 1.25,
+                    color: q.done ? C.mute : C.text, textDecoration: q.done ? 'line-through' : 'none',
+                  }}>{q.title}</div>
+                  <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 5 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: st.color, fontFamily: 'Chakra Petch, sans-serif', fontSize: 11, letterSpacing: '.14em' }}>
+                      <I size={11} />{q.stat}
+                    </span>
+                    <button onClick={() => flip(q.id)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.16em',
+                      color: q.mandatory ? C.red : 'rgba(255,255,255,.25)',
+                    }}>{q.mandatory ? '● REQUIRED' : '○ OPTIONAL'}</button>
+                  </div>
+                </div>
+                <button onClick={() => del(q.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.2)', cursor: 'pointer', padding: '0 13px' }}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </Panel>
+          );
+        })}
+      </div>
+
+      <div style={{ height: 13 }} />
+      {!open ? (
+        <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Add a daily quest</Btn>
+      ) : (
+        <Panel glow>
+          <Eyebrow>New daily quest</Eyebrow>
+          <Field value={t} onChange={e => setT(e.target.value)} placeholder="e.g. Drink 8 glasses of water" onKeyDown={e => e.key === 'Enter' && submit()} />
+          <div style={{ height: 11 }} />
+          <StatPicker value={s} onChange={setS} />
+          <div style={{ height: 11 }} />
+          <label style={{ display: 'flex', gap: 9, alignItems: 'center', cursor: 'pointer', fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text }}>
+            <input type="checkbox" checked={m} onChange={() => setM(!m)} style={{ width: 16, height: 16, accentColor: C.red }} />
+            Required — missing it breaks the streak
+          </label>
+          <div style={{ height: 14, }} />
+          <div style={{ display: 'flex', gap: 9 }}>
+            <Btn onClick={submit} disabled={!t.trim()}>Add quest</Btn>
+            <Btn tone="ghost" onClick={() => { setOpen(false); setT(''); }}>Cancel</Btn>
+          </div>
+        </Panel>
+      )}
+    </>
+  );
+}
+
+function StatPicker({ value, onChange }) {
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+        {STATS.map(s => {
+          const on = value === s.k; const I = s.icon;
+          return (
+            <button key={s.k} onClick={() => onChange(s.k)} style={{
+              background: on ? `${s.color}22` : 'rgba(255,255,255,.04)', border: 'none', cursor: 'pointer',
+              boxShadow: `inset 0 0 0 1px ${on ? s.color + '88' : 'rgba(255,255,255,.07)'}`,
+              clipPath: cut(6), padding: '9px 0', color: on ? s.color : C.mute,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            }}>
+              <I size={15} />
+              <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.1em' }}>{s.k}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, marginTop: 7, lineHeight: 1.35 }}>
+        {STAT_MAP[value].name} — {STAT_MAP[value].hint}
+      </div>
+    </>
+  );
+}
+
+function Quests({ d, add, del, finish, stepFlip, addStep }) {
+  const [open, setOpen] = useState(false);
+  const [t, setT] = useState(''); const [s, setS] = useState('INT'); const [r, setR] = useState('C'); const [due, setDue] = useState('');
+  const [expand, setExpand] = useState(null);
+  const [stepTxt, setStepTxt] = useState('');
+
+  const submit = () => {
+    if (!t.trim()) return;
+    add({ id: uid(), title: t.trim(), stat: s, rank: r, due, steps: [], done: false });
+    setT(''); setDue(''); setOpen(false);
+  };
+  const active = d.quests.filter(q => !q.done);
+  const done = d.quests.filter(q => q.done);
+
+  const card = q => {
+    const st = STAT_MAP[q.stat]; const I = st.icon; const rw = DIFF[q.rank];
+    const rc = (RANKS.find(x => x.r === q.rank) || {}).c || C.cyan;
+    const ex = expand === q.id;
+    const stepsDone = q.steps.filter(x => x.done).length;
+    return (
+      <Panel key={q.id} pad={14} style={{ opacity: q.done ? .45 : 1 }}>
+        <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+          <div style={{
+            width: 31, height: 31, flexShrink: 0, display: 'grid', placeItems: 'center',
+            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+            background: `${rc}22`, color: rc, fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 14,
+          }}>{q.rank}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.text, lineHeight: 1.25 }}>{q.title}</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5, fontFamily: 'Chakra Petch, sans-serif', fontSize: 10.5, letterSpacing: '.11em' }}>
+              <span style={{ color: st.color, display: 'inline-flex', gap: 4, alignItems: 'center' }}><I size={11} />{q.stat}</span>
+              <span style={{ color: C.amber }}>+{rw.xp} XP · +{rw.p} PTS</span>
+              {q.due && <span style={{ color: C.mute }}>BY {q.due}</span>}
+              {q.steps.length > 0 && <span style={{ color: C.mute }}>{stepsDone}/{q.steps.length} STEPS</span>}
+            </div>
+          </div>
+          <button onClick={() => setExpand(ex ? null : q.id)} style={{ background: 'none', border: 'none', color: C.mute, cursor: 'pointer', padding: 2 }}>
+            <ChevronDown size={17} style={{ transform: ex ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+          </button>
+        </div>
+
+        {ex && (
+          <div style={{ marginTop: 13, paddingTop: 13, boxShadow: `inset 0 1px 0 ${C.lineSoft}` }}>
+            {q.steps.map((s2, i) => (
+              <button key={i} onClick={() => stepFlip(q.id, i)} style={{
+                display: 'flex', gap: 9, alignItems: 'center', width: '100%', background: 'none',
+                border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left',
+              }}>
+                <div style={{
+                  width: 15, height: 15, flexShrink: 0, display: 'grid', placeItems: 'center', clipPath: cut(4),
+                  boxShadow: `inset 0 0 0 1.5px ${s2.done ? C.cyan : 'rgba(255,255,255,.22)'}`,
+                  background: s2.done ? `${C.cyan}33` : 'transparent', color: C.cyan,
+                }}>{s2.done && <Check size={10} />}</div>
+                <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: s2.done ? C.mute : C.text, textDecoration: s2.done ? 'line-through' : 'none' }}>{s2.t}</span>
+              </button>
+            ))}
+            {!q.done && (
+              <>
+                <div style={{ display: 'flex', gap: 7, marginTop: 9 }}>
+                  <Field value={stepTxt} onChange={e => setStepTxt(e.target.value)} placeholder="Add a step"
+                    onKeyDown={e => { if (e.key === 'Enter' && stepTxt.trim()) { addStep(q.id, stepTxt.trim()); setStepTxt(''); } }} />
+                  <Btn small tone="ghost" onClick={() => { if (stepTxt.trim()) { addStep(q.id, stepTxt.trim()); setStepTxt(''); } }}><Plus size={14} /></Btn>
+                </div>
+                <div style={{ display: 'flex', gap: 9, marginTop: 13 }}>
+                  <Btn small tone="gold" onClick={() => finish(q.id)}><Trophy size={14} />Complete</Btn>
+                  <Btn small tone="ghost" onClick={() => del(q.id)}><Trash2 size={14} />Delete</Btn>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Panel>
+    );
+  };
+
+  return (
+    <>
+      <Panel glow>
+        <Eyebrow>Quests</Eyebrow>
+        <p style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15.5, color: C.mute, margin: 0, lineHeight: 1.45 }}>
+          Bigger objectives with a deadline. Set the rank honestly — an S-rank should scare you a little.
+        </p>
+      </Panel>
+      <div style={{ height: 13 }} />
+      <div style={{ display: 'grid', gap: 9 }}>{active.map(card)}</div>
+      {active.length === 0 && (
+        <Panel pad={22}>
+          <div style={{ textAlign: 'center', fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15.5 }}>
+            No active quests. Name the thing you keep putting off.
+          </div>
+        </Panel>
+      )}
+
+      <div style={{ height: 13 }} />
+      {!open ? (
+        <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Accept a new quest</Btn>
+      ) : (
+        <Panel glow>
+          <Eyebrow>New quest</Eyebrow>
+          <Field value={t} onChange={e => setT(e.target.value)} placeholder="e.g. Save 3 months of expenses" />
+          <div style={{ height: 11 }} />
+          <StatPicker value={s} onChange={setS} />
+          <div style={{ height: 13 }} />
+          <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.28em', color: C.cyan, marginBottom: 7 }}>DIFFICULTY</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
+            {['E', 'D', 'C', 'B', 'A', 'S'].map(x => {
+              const on = r === x; const rc = (RANKS.find(y => y.r === x) || {}).c;
+              return (
+                <button key={x} onClick={() => setR(x)} style={{
+                  background: on ? `${rc}25` : 'rgba(255,255,255,.04)', border: 'none', cursor: 'pointer',
+                  boxShadow: `inset 0 0 0 1px ${on ? rc + '88' : 'rgba(255,255,255,.07)'}`, clipPath: cut(6),
+                  padding: '10px 0', color: on ? rc : C.mute, fontFamily: 'Chakra Petch, sans-serif', fontSize: 15, fontWeight: 600,
+                }}>{x}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, marginTop: 7 }}>
+            Reward: +{DIFF[r].xp} XP and +{DIFF[r].p} points
+          </div>
+          <div style={{ height: 13 }} />
+          <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.28em', color: C.cyan, marginBottom: 7 }}>DEADLINE (OPTIONAL)</div>
+          <Field type="date" value={due} onChange={e => setDue(e.target.value)} />
+          <div style={{ height: 14 }} />
+          <div style={{ display: 'flex', gap: 9 }}>
+            <Btn onClick={submit} disabled={!t.trim()}>Accept</Btn>
+            <Btn tone="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
+          </div>
+        </Panel>
+      )}
+
+      {done.length > 0 && (
+        <>
+          <div style={{ height: 20 }} />
+          <Eyebrow color={C.mute}>Cleared</Eyebrow>
+          <div style={{ display: 'grid', gap: 9 }}>{done.map(card)}</div>
+        </>
+      )}
+    </>
+  );
+}
+
+function Shop({ d, buy, addReward, delReward }) {
+  const [mode, setMode] = useState('rewards');
+  const [open, setOpen] = useState(false);
+  const [n, setN] = useState(''); const [c, setC] = useState(''); const [note, setNote] = useState('');
+  const submit = () => {
+    const cost = parseInt(c, 10);
+    if (!n.trim() || !cost || cost < 1) return;
+    addReward(n.trim(), cost, note.trim()); setN(''); setC(''); setNote(''); setOpen(false);
+  };
+
+  return (
+    <>
+      <Panel glow>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Eyebrow color={C.amber}>Shop</Eyebrow>
+            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 21, color: C.amber }}>{d.points.toLocaleString()} points</div>
+          </div>
+          <Coins size={28} color={C.amber} style={{ opacity: .5 }} />
+        </div>
+      </Panel>
+      <div style={{ height: 13 }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Btn small wide tone={mode === 'rewards' ? 'cyan' : 'ghost'} onClick={() => setMode('rewards')}>Your rewards</Btn>
+        <Btn small wide tone={mode === 'medals' ? 'cyan' : 'ghost'} onClick={() => setMode('medals')}>Medals</Btn>
+      </div>
+      <div style={{ height: 13 }} />
+
+      {mode === 'rewards' && (
+        <>
+          <div style={{ display: 'grid', gap: 9 }}>
+            {d.shop.map(it => {
+              const can = d.points >= it.cost;
+              return (
+                <Panel key={it.id} pad={14}>
+                  <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.text, lineHeight: 1.25 }}>{it.name}</div>
+                      {it.note && <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13.5, color: C.mute, marginTop: 3 }}>{it.note}</div>}
+                      <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 12, color: C.amber, marginTop: 5, letterSpacing: '.1em' }}>{it.cost} PTS</div>
+                    </div>
+                    <Btn small tone={can ? 'gold' : 'ghost'} disabled={!can} onClick={() => buy(it)}>
+                      {can ? 'Buy' : <Lock size={13} />}
+                    </Btn>
+                    <button onClick={() => delReward(it.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.18)', cursor: 'pointer' }}>
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+          <div style={{ height: 13 }} />
+          {!open ? (
+            <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Add a reward</Btn>
+          ) : (
+            <Panel glow>
+              <Eyebrow>New reward</Eyebrow>
+              <Field value={n} onChange={e => setN(e.target.value)} placeholder="What do you actually want?" />
+              <div style={{ height: 10 }} />
+              <Field value={c} onChange={e => setC(e.target.value.replace(/\D/g, ''))} placeholder="Cost in points" inputMode="numeric" />
+              <div style={{ height: 10 }} />
+              <Field value={note} onChange={e => setNote(e.target.value)} placeholder="Any rules for it (optional)" />
+              <div style={{ height: 14 }} />
+              <div style={{ display: 'flex', gap: 9 }}>
+                <Btn onClick={submit} disabled={!n.trim() || !c}>Add to shop</Btn>
+                <Btn tone="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
+              </div>
+            </Panel>
+          )}
+        </>
+      )}
+
+      {mode === 'medals' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+          {MEDALS.map(m => {
+            const can = d.points >= m.cost;
+            const owned = d.bag.filter(b => b.refId === m.id).length;
+            return (
+              <Panel key={m.id} pad={13}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: 27, color: m.color, lineHeight: 1, textShadow: `0 0 14px ${m.color}88` }}>{m.sym}</div>
+                  {owned > 0 && <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 11, color: C.mute }}>×{owned}</div>}
+                </div>
+                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text, marginTop: 8, lineHeight: 1.2 }}>{m.name}</div>
+                <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 9.5, letterSpacing: '.18em', color: m.color, marginTop: 3, opacity: .8 }}>{m.tier.toUpperCase()}</div>
+                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 12.5, color: C.mute, marginTop: 6, lineHeight: 1.3, minHeight: 32 }}>{m.desc}</div>
+                <div style={{ height: 9 }} />
+                <Btn small wide tone={can ? 'gold' : 'ghost'} disabled={!can} onClick={() => buy(m)}>
+                  {can ? `${m.cost} pts` : <><Lock size={12} />{m.cost}</>}
+                </Btn>
+              </Panel>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function Bag({ d, useItem, sellItem }) {
+  const medals = d.bag.filter(b => b.kind === 'medal');
+  const rewards = d.bag.filter(b => b.kind === 'reward');
+  return (
+    <>
+      <Panel glow>
+        <Eyebrow>Inventory</Eyebrow>
+        <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 19, color: C.text }}>
+          {medals.length} medal{medals.length === 1 ? '' : 's'} · {rewards.filter(r => !r.used).length} unclaimed reward{rewards.filter(r => !r.used).length === 1 ? '' : 's'}
+        </div>
+      </Panel>
+
+      <div style={{ height: 14 }} />
+      <Eyebrow color={C.mute}>Rewards</Eyebrow>
+      <div style={{ display: 'grid', gap: 9 }}>
+        {rewards.length === 0 && <Panel pad={18}><div style={{ fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15, textAlign: 'center' }}>Nothing bought yet. Points are no good sitting there.</div></Panel>}
+        {rewards.map(b => (
+          <Panel key={b.uid} pad={13} style={{ opacity: b.used ? .45 : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 16, color: C.text }}>{b.name}</div>
+                <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10.5, letterSpacing: '.12em', color: C.mute, marginTop: 3 }}>
+                  {b.used ? 'CLAIMED' : `BOUGHT ${b.at}`}
+                </div>
+              </div>
+              {!b.used && <Btn small onClick={() => useItem(b.uid)}>Claim it</Btn>}
+              {!b.used && <Btn small tone="ghost" onClick={() => sellItem(b.uid)} title="Refund half">Sell</Btn>}
+            </div>
+          </Panel>
+        ))}
+      </div>
+
+      <div style={{ height: 18 }} />
+      <Eyebrow color={C.mute}>Medal case</Eyebrow>
+      {medals.length === 0 ? (
+        <Panel pad={18}><div style={{ fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15, textAlign: 'center' }}>Empty case.</div></Panel>
+      ) : (
+        <Panel pad={16}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(72px,1fr))', gap: 12 }}>
+            {medals.map(b => (
+              <button key={b.uid} onClick={() => sellItem(b.uid)} title={`${b.name} — tap to sell for ${Math.floor(b.cost / 2)} pts`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'center' }}>
+                <div style={{ fontSize: 31, color: b.color, textShadow: `0 0 16px ${b.color}99`, lineHeight: 1 }}>{b.sym}</div>
+                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11.5, color: C.mute, marginTop: 5, lineHeight: 1.2 }}>{b.name}</div>
+              </button>
+            ))}
+          </div>
+        </Panel>
+      )}
+    </>
+  );
+}
+
+/* ── the level-up window ─────────────────────────────────── */
+function SystemWindow({ m, onClose }) {
+  const isLevel = m.kind === 'level';
+  const accent = isLevel ? C.cyan : m.stat.color;
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(2,4,10,.86)',
+      display: 'grid', placeItems: 'center', padding: 22, cursor: 'pointer',
+    }}>
+      <div className="sysopen" style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{
+          background: 'rgba(8,17,36,.97)', padding: 30, clipPath: cut(20), textAlign: 'center',
+          boxShadow: `inset 0 0 0 1px ${accent}88, 0 0 60px ${accent}33`,
+        }}>
+          <div style={{ fontFamily: 'Chakra Petch, monospace', fontSize: 10.5, letterSpacing: '.42em', color: accent, opacity: .9 }}>NOTIFICATION</div>
+          <div style={{ height: 18 }} />
+          {isLevel ? (
+            <>
+              <div style={{
+                fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 34, color: '#fff',
+                letterSpacing: '.06em', textShadow: `0 0 26px ${accent}`,
+              }}>LEVEL UP</div>
+              <div style={{ height: 14 }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 27, color: C.mute }}>{m.from}</span>
+                <span style={{ color: accent, fontSize: 20 }}>▶</span>
+                <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 40, color: accent, textShadow: `0 0 20px ${accent}` }}>{m.to}</span>
+              </div>
+              {m.rankUp && (
+                <div style={{ marginTop: 20, paddingTop: 16, boxShadow: `inset 0 1px 0 ${C.lineSoft}`, fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.amber }}>
+                  You have advanced to <strong>Rank {m.rankUp}</strong>.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 25, color: '#fff', letterSpacing: '.04em' }}>
+                {m.stat.name.toUpperCase()} +{m.to - m.from}
+              </div>
+              <div style={{ height: 12 }} />
+              <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 34, color: accent, textShadow: `0 0 20px ${accent}` }}>
+                {m.stat.k} {m.to}
+              </div>
+            </>
+          )}
+          <div style={{ height: 26 }} />
+          <Btn wide onClick={onClose}>Confirm</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Boot() {
+  return (
+    <Frame>
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ fontFamily: 'Chakra Petch, monospace', fontSize: 12, letterSpacing: '.4em', color: C.cyan, opacity: .7 }}>
+          CONNECTING TO THE SYSTEM
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* ── page shell + global style ───────────────────────────── */
+function Frame({ children }) {
+  return (
+    <div style={{
+      minHeight: '100vh', background: `radial-gradient(120% 80% at 50% 0%, #0b1730 0%, ${C.void} 62%)`,
+      color: C.text, fontFamily: 'Rajdhani, system-ui, sans-serif', position: 'relative', overflowX: 'hidden',
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        button:focus-visible, input:focus-visible { outline: 2px solid ${C.cyan}; outline-offset: 2px; }
+        .grid-bg {
+          position: fixed; inset: 0; pointer-events: none; opacity: .35;
+          background-image:
+            linear-gradient(${C.lineSoft} 1px, transparent 1px),
+            linear-gradient(90deg, ${C.lineSoft} 1px, transparent 1px);
+          background-size: 46px 46px;
+          mask-image: radial-gradient(90% 60% at 50% 0%, #000 0%, transparent 75%);
+          -webkit-mask-image: radial-gradient(90% 60% at 50% 0%, #000 0%, transparent 75%);
+        }
+        @keyframes sysopen {
+          from { opacity: 0; transform: translateY(10px) scale(.965); }
+          to   { opacity: 1; transform: none; }
+        }
+        .sysopen { animation: sysopen .3s cubic-bezier(.2,.9,.25,1) both; }
+        @media (prefers-reduced-motion: reduce) {
+          .sysopen { animation: none; }
+          .sysbar { transition: none !important; }
+        }
+      `}</style>
+      <div className="grid-bg" />
+      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+    </div>
+  );
+}
