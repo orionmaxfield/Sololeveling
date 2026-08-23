@@ -1,1012 +1,822 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Swords, Wind, Heart, Brain, Eye, Plus, Check, Trash2, Trophy,
-  Store, ScrollText, User, Coins, Flame, X, Package, Target,
-  AlertTriangle, ChevronDown, Lock
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04070f">
+<title>The System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#04070f; --panel:rgba(12,26,51,.72);
+  --line:rgba(77,208,255,.34); --lineSoft:rgba(77,208,255,.14);
+  --cyan:#4dd0ff; --amber:#f5a524; --red:#ff4d6d; --green:#4ade80;
+  --text:#dfefff; --mute:#7d95b5;
+  --cut:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh; background:radial-gradient(120% 80% at 50% 0%,#0b1730 0%,var(--void) 62%);
+  background-attachment:fixed; color:var(--text);
+  font-family:Rajdhani,system-ui,sans-serif; overflow-x:hidden;
+}
+#grid{
+  position:fixed; inset:0; pointer-events:none; opacity:.35; z-index:0;
+  background-image:linear-gradient(var(--lineSoft) 1px,transparent 1px),linear-gradient(90deg,var(--lineSoft) 1px,transparent 1px);
+  background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(90% 60% at 50% 0%,#000 0%,transparent 75%);
+  mask-image:radial-gradient(90% 60% at 50% 0%,#000 0%,transparent 75%);
+}
+#app{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:18px 15px 106px}
+button{font:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+svg{display:block}
 
-/* ────────────────────────────────────────────────────────────
-   THE SYSTEM — a personal leveling tracker
-   ──────────────────────────────────────────────────────────── */
+.panel{
+  position:relative;background:var(--panel);padding:16px;
+  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));
+  box-shadow:inset 0 0 0 1px var(--lineSoft);
+}
+.panel.glow{box-shadow:inset 0 0 0 1px var(--line),0 0 26px rgba(77,208,255,.10)}
+.panel.p0{padding:0}.panel.p13{padding:13px}.panel.p14{padding:14px}.panel.p18{padding:18px}
+.stack{display:grid;gap:9px}
+.row{display:flex;align-items:center;gap:10px}
+.sp{height:14px}.sp8{height:9px}.sp20{height:20px}
+.flex1{flex:1;min-width:0}
 
-const KEY = 'the-system-v1';
+.eyebrow{font-family:'Chakra Petch',monospace;font-size:10px;letter-spacing:.3em;
+  color:var(--cyan);text-transform:uppercase;opacity:.85;margin-bottom:8px}
+.hd{font-family:'Chakra Petch',sans-serif}
+.mono{font-family:'Chakra Petch',monospace}
+.mute{color:var(--mute)}
 
-const C = {
-  void: '#04070f',
-  deep: '#070d1c',
-  panel: 'rgba(12, 26, 51, 0.72)',
-  line: 'rgba(77, 208, 255, 0.34)',
-  lineSoft: 'rgba(77, 208, 255, 0.14)',
-  cyan: '#4dd0ff',
-  cyanDim: '#7fb4d4',
-  violet: '#a78bfa',
-  amber: '#f5a524',
-  red: '#ff4d6d',
-  green: '#4ade80',
-  text: '#dfefff',
-  mute: '#7d95b5',
+.btn{
+  background:rgba(77,208,255,.11);color:var(--cyan);border:0;
+  box-shadow:inset 0 0 0 1px rgba(77,208,255,.4);
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  padding:11px 18px;font-family:Rajdhani,sans-serif;font-weight:600;font-size:15px;
+  letter-spacing:.09em;text-transform:uppercase;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn.small{padding:7px 12px;font-size:13px}
+.btn.wide{width:100%}
+.btn.gold{background:rgba(245,165,36,.11);color:var(--amber);box-shadow:inset 0 0 0 1px rgba(245,165,36,.4)}
+.btn.ghost{background:rgba(125,149,181,.10);color:var(--mute);box-shadow:inset 0 0 0 1px rgba(125,149,181,.32)}
+.btn[disabled]{background:rgba(255,255,255,.04);color:var(--mute);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);cursor:not-allowed}
+.icobtn{background:none;border:0;color:rgba(255,255,255,.2);cursor:pointer;padding:0 13px}
+.icobtn:hover{color:var(--red)}
+
+.field{
+  width:100%;background:rgba(255,255,255,.05);color:var(--text);
+  box-shadow:inset 0 0 0 1px var(--lineSoft);border:0;outline:0;
+  padding:11px 13px;font-family:Rajdhani,sans-serif;font-size:16px;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+}
+input[type=date].field{min-height:44px}
+
+.bar{height:7px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar>i{display:block;height:100%;transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.bar.tall{height:9px}
+
+.hex{clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+  display:grid;place-items:center;font-family:'Chakra Petch',sans-serif;font-weight:700}
+
+.box{width:21px;height:21px;display:grid;place-items:center;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+
+.check{width:52px;background:transparent;border:0;cursor:pointer;display:grid;place-items:center;
+  color:var(--mute);box-shadow:inset -1px 0 0 var(--lineSoft)}
+.check.on{background:rgba(77,208,255,.12);color:var(--cyan)}
+
+.tag{font-family:'Chakra Petch',sans-serif;font-size:11px;letter-spacing:.14em;
+  display:inline-flex;align-items:center;gap:4px}
+.linkish{background:none;border:0;padding:0;cursor:pointer;font-family:'Chakra Petch',sans-serif;
+  font-size:10px;letter-spacing:.16em}
+
+nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(4,7,15,.93);
+  box-shadow:inset 0 1px 0 var(--lineSoft);backdrop-filter:blur(8px);
+  display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+nav>div{display:flex;width:100%;max-width:560px}
+nav button{flex:1;background:none;border:0;cursor:pointer;padding:11px 0 13px;color:var(--mute);
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:4px}
+nav button.on{color:var(--cyan)}
+nav button.on::before{content:"";position:absolute;top:0;left:26%;right:26%;height:2px;
+  background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+nav span{font-family:Rajdhani,sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.dot{position:absolute;top:8px;right:26%;width:7px;height:7px;border-radius:50%;
+  background:var(--red);box-shadow:0 0 8px var(--red)}
+
+#toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:60;
+  background:rgba(7,13,28,.96);color:var(--cyan);padding:11px 18px;
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);
+  box-shadow:inset 0 0 0 1px var(--line);font-size:15px;letter-spacing:.04em;
+  max-width:88vw;text-align:center;display:none}
+#toast.bad{color:var(--red);box-shadow:inset 0 0 0 1px rgba(255,77,109,.5)}
+
+#modal{position:fixed;inset:0;z-index:90;background:rgba(2,4,10,.86);
+  display:none;place-items:center;padding:22px;cursor:pointer}
+#modal.on{display:grid}
+.win{width:100%;max-width:380px;background:rgba(8,17,36,.97);padding:30px;text-align:center;
+  clip-path:polygon(20px 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%,0 20px);
+  animation:pop .3s cubic-bezier(.2,.9,.25,1) both}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.965)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.win{animation:none}.bar>i{transition:none}}
+
+.medals{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.case{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:12px}
+.five{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.six{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.pick{background:rgba(255,255,255,.04);border:0;cursor:pointer;padding:9px 0;color:var(--mute);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  display:flex;flex-direction:column;align-items:center;gap:3px}
+.spark{display:flex;gap:4px;align-items:flex-end;height:44px}
+.spark>div{flex:1;height:100%;display:flex;align-items:flex-end}
+.spark i{display:block;width:100%;background:rgba(255,255,255,.06)}
+label.chk{display:flex;gap:11px;align-items:center;cursor:pointer;font-size:15px}
+label.chk input{width:17px;height:17px;accent-color:var(--red);flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="app"></div>
+<nav id="nav"></nav>
+<div id="toast"></div>
+<div id="modal"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ─── icons ────────────────────────────────────────────── */
+function svg(d,extra,size){
+  return '<svg width="'+(size||16)+'" height="'+(size||16)+'" viewBox="0 0 24 24" fill="none" '+
+    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
+    d+(extra||'')+'</svg>';
+}
+var I = {
+  str:  svg('<path d="M4 20 L19 5"/><path d="M14 5h5v5"/><path d="M4 20h4"/><path d="M4 20v-4"/>'),
+  agi:  svg('<path d="M3 8h9a3 3 0 1 0-3-3"/><path d="M3 12h13a3 3 0 1 1-3 3"/><path d="M3 16h7"/>'),
+  vit:  svg('<path d="M12 20s-7-4.2-9-8C1.2 8.6 3.4 5 6.6 5 8.7 5 10.4 6.2 12 8.2 13.6 6.2 15.3 5 17.4 5 20.6 5 22.8 8.6 21 12c-2 3.8-9 8-9 8z"/>'),
+  int:  svg('<path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M19 16H6a2 2 0 0 0-2 2"/><path d="M9 7h6"/>'),
+  per:  svg('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+  user: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',null,19),
+  target:svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',null,19),
+  scroll:svg('<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 8h7"/><path d="M8 12h7"/><path d="M8 16h4"/>',null,19),
+  store:svg('<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/>',null,19),
+  bag:  svg('<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',null,19),
+  check:svg('<path d="M4 12l5 5L20 6"/>',null,13),
+  plus: svg('<path d="M12 5v14"/><path d="M5 12h14"/>',null,15),
+  trash:svg('<path d="M4 6h16"/><path d="M9 6V4h6v2"/><path d="M6 6l1 15h10l1-15"/>',null,15),
+  coins:svg('<circle cx="9" cy="9" r="5"/><path d="M13.5 5.2A5 5 0 1 1 16 15.5"/>',null,15),
+  flame:svg('<path d="M12 22c4 0 7-3 7-7 0-4-4-6-4-10-3 2-4 4.5-4 6.5C11 10 10 9 9 8c-1 2-4 4-4 7 0 4 3 7 7 7z"/>',null,13),
+  lock: svg('<rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V8a4 4 0 1 1 8 0v3"/>',null,13),
+  chev: svg('<path d="M6 9l6 6 6-6"/>',null,17),
+  alert:svg('<path d="M12 3l10 18H2z"/><path d="M12 9v5"/><path d="M12 17.6v.4"/>',null,15),
+  trophy:svg('<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4a3 3 0 0 0 3 3"/><path d="M17 5h3a3 3 0 0 1-3 3"/><path d="M10 14h4v5h-4z"/><path d="M8 19h8"/>',null,14)
 };
 
-const STATS = [
-  { k: 'STR', name: 'Strength', icon: Swords, color: '#ff6b7d', hint: 'Lifting, resistance work, physical effort, hard chores' },
-  { k: 'AGI', name: 'Agility', icon: Wind, color: '#4ade80', hint: 'Walking, running, sport, mobility, getting outside' },
-  { k: 'VIT', name: 'Vitality', icon: Heart, color: '#f5a524', hint: 'Sleep, food, water, rest, appointments kept' },
-  { k: 'INT', name: 'Intelligence', icon: Brain, color: '#4dd0ff', hint: 'Study, reading, skills, budgeting, saving, work on the business' },
-  { k: 'PER', name: 'Perception', icon: Eye, color: '#a78bfa', hint: 'Stillness, prayer, journaling, people you love, self-honesty' },
+/* ─── data model ───────────────────────────────────────── */
+var KEY='the-system-v1';
+var STATS=[
+ {k:'STR',name:'Strength',    ico:'str',c:'#ff6b7d',hint:'Lifting, resistance work, physical effort, hard chores'},
+ {k:'AGI',name:'Agility',     ico:'agi',c:'#4ade80',hint:'Walking, running, sport, mobility, getting outside'},
+ {k:'VIT',name:'Vitality',    ico:'vit',c:'#f5a524',hint:'Sleep, food, water, rest, appointments kept'},
+ {k:'INT',name:'Intelligence',ico:'int',c:'#4dd0ff',hint:'Study, reading, skills, budgeting, saving, work on the business'},
+ {k:'PER',name:'Perception',  ico:'per',c:'#a78bfa',hint:'Stillness, prayer, journaling, people you love, self-honesty'}
 ];
-const STAT_MAP = Object.fromEntries(STATS.map(s => [s.k, s]));
+var SM={}; STATS.forEach(function(s){SM[s.k]=s;});
 
-const RANKS = [
-  { min: 70, r: 'S', c: '#f5a524' },
-  { min: 50, r: 'A', c: '#ff6b7d' },
-  { min: 35, r: 'B', c: '#a78bfa' },
-  { min: 20, r: 'C', c: '#4dd0ff' },
-  { min: 10, r: 'D', c: '#4ade80' },
-  { min: 1, r: 'E', c: '#7d95b5' },
+var RANKS=[{min:70,r:'S',c:'#f5a524'},{min:50,r:'A',c:'#ff6b7d'},{min:35,r:'B',c:'#a78bfa'},
+           {min:20,r:'C',c:'#4dd0ff'},{min:10,r:'D',c:'#4ade80'},{min:1,r:'E',c:'#7d95b5'}];
+function rankOf(l){for(var i=0;i<RANKS.length;i++){if(l>=RANKS[i].min)return RANKS[i];}return RANKS[5];}
+function rankColor(r){for(var i=0;i<RANKS.length;i++){if(RANKS[i].r===r)return RANKS[i].c;}return '#4dd0ff';}
+
+var DIFF={E:{xp:60,p:30},D:{xp:120,p:60},C:{xp:220,p:120},B:{xp:400,p:220},A:{xp:700,p:400},S:{xp:1200,p:800}};
+
+var MEDALS=[
+ {id:'star',  name:'Gold Star',       sym:'★',cost:50,  tier:'Common',   color:'#f5d24a',desc:'The classic. Proof you showed up.'},
+ {id:'bronze',name:'Bronze Medal',    sym:'◉',cost:120, tier:'Common',   color:'#c08457',desc:'For a week that held together.'},
+ {id:'shard', name:'Mana Shard',      sym:'◈',cost:200, tier:'Uncommon', color:'#4dd0ff',desc:'A small piece of stored effort.'},
+ {id:'silver',name:'Silver Medal',    sym:'◉',cost:300, tier:'Uncommon', color:'#cbd5e1',desc:'For finishing something you wanted to quit.'},
+ {id:'elixir',name:'Elixir of Life',  sym:'⚗',cost:420, tier:'Uncommon', color:'#4ade80',desc:'Recovery, earned rather than borrowed.'},
+ {id:'gold',  name:'Gold Medal',      sym:'◉',cost:600, tier:'Rare',     color:'#f5a524',desc:'Top of the podium in your own house.'},
+ {id:'crest', name:"Knight's Crest",  sym:'⛨',cost:850, tier:'Rare',     color:'#4dd0ff',desc:'For keeping your word to yourself.'},
+ {id:'dagger',name:"Hunter's Dagger", sym:'⚔',cost:1100,tier:'Rare',     color:'#dfefff',desc:'For the day you went in anyway.'},
+ {id:'frag',  name:'Shadow Fragment', sym:'✧',cost:1600,tier:'Epic',     color:'#a78bfa',desc:'Something you feared, now working for you.'},
+ {id:'key',   name:'Red Gate Key',    sym:'⚿',cost:2200,tier:'Epic',     color:'#ff4d6d',desc:'Opens the hard thing you keep avoiding.'},
+ {id:'sigil', name:"Monarch's Sigil", sym:'⬢',cost:4000,tier:'Legendary',color:'#e879f9',desc:'Sovereign over your own schedule.'},
+ {id:'throne',name:'Shadow Throne',   sym:'♛',cost:8000,tier:'Legendary',color:'#f5a524',desc:'The long game, won.'}
 ];
-const rankOf = lvl => RANKS.find(r => lvl >= r.min) || RANKS[RANKS.length - 1];
+var MEDAL_MAP={}; MEDALS.forEach(function(m){MEDAL_MAP[m.id]=m;});
 
-const DIFF = {
-  E: { xp: 60, p: 30 }, D: { xp: 120, p: 60 }, C: { xp: 220, p: 120 },
-  B: { xp: 400, p: 220 }, A: { xp: 700, p: 400 }, S: { xp: 1200, p: 800 },
-};
+function today(){return new Date().toLocaleDateString('en-CA');}
+function uid(){return Math.random().toString(36).slice(2,9);}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
-const MEDALS = [
-  { id: 'star', name: 'Gold Star', sym: '★', cost: 50, tier: 'Common', color: '#f5d24a', desc: 'The classic. Proof you showed up.' },
-  { id: 'bronze', name: 'Bronze Medal', sym: '◉', cost: 120, tier: 'Common', color: '#c08457', desc: 'Awarded for a week that held together.' },
-  { id: 'shard', name: 'Mana Shard', sym: '◈', cost: 200, tier: 'Uncommon', color: '#4dd0ff', desc: 'A small piece of stored effort.' },
-  { id: 'silver', name: 'Silver Medal', sym: '◉', cost: 300, tier: 'Uncommon', color: '#cbd5e1', desc: 'For finishing something you wanted to quit.' },
-  { id: 'elixir', name: 'Elixir of Life', sym: '⚗', cost: 420, tier: 'Uncommon', color: '#4ade80', desc: 'Recovery, earned rather than borrowed.' },
-  { id: 'gold', name: 'Gold Medal', sym: '◉', cost: 600, tier: 'Rare', color: '#f5a524', desc: 'Top of the podium in your own house.' },
-  { id: 'crest', name: "Knight's Crest", sym: '⛨', cost: 850, tier: 'Rare', color: '#4dd0ff', desc: 'Given to those who keep their word to themselves.' },
-  { id: 'dagger', name: "Hunter's Dagger", sym: '⚔', cost: 1100, tier: 'Rare', color: '#dfefff', desc: 'For the day you went in anyway.' },
-  { id: 'frag', name: 'Shadow Fragment', sym: '✧', cost: 1600, tier: 'Epic', color: '#a78bfa', desc: 'Something you used to fear, now working for you.' },
-  { id: 'key', name: 'Red Gate Key', sym: '⚿', cost: 2200, tier: 'Epic', color: '#ff4d6d', desc: 'Opens the hard thing you have been avoiding.' },
-  { id: 'sigil', name: "Monarch's Sigil", sym: '⬢', cost: 4000, tier: 'Legendary', color: '#e879f9', desc: 'Sovereign over your own schedule.' },
-  { id: 'throne', name: 'Shadow Throne', sym: '♛', cost: 8000, tier: 'Legendary', color: '#f5a524', desc: 'The long game, won.' },
-];
-
-const SEED_DAILIES = [
-  { id: 'd1', title: '20 push-ups', stat: 'STR', mandatory: true, done: false },
-  { id: 'd2', title: 'Walk or run for 15 minutes', stat: 'AGI', mandatory: true, done: false },
-  { id: 'd3', title: 'In bed by a set time', stat: 'VIT', mandatory: true, done: false },
-  { id: 'd4', title: 'Read or study for 20 minutes', stat: 'INT', mandatory: false, done: false },
-  { id: 'd5', title: '5 minutes of stillness', stat: 'PER', mandatory: false, done: false },
-];
-
-const SEED_SHOP = [
-  { id: 's1', name: 'Movie night, no guilt', cost: 200, note: 'Pick anything. Phone stays down.' },
-  { id: 's2', name: 'Meal out at the good place', cost: 500, note: '' },
-  { id: 's3', name: 'A full day off. No quests.', cost: 1200, note: 'Streak protected.' },
-];
-
-/* ── math ───────────────────────────────────────────────── */
-const today = () => new Date().toLocaleDateString('en-CA');
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-function progress(xp, base, inc) {
-  let lvl = 1, need = base, rem = Math.max(0, xp);
-  while (rem >= need && lvl < 999) { rem -= need; lvl++; need = base + (lvl - 1) * inc; }
-  return { lvl, rem, need };
+function progress(xp,base,inc){
+  var lvl=1,need=base,rem=Math.max(0,xp);
+  while(rem>=need&&lvl<999){rem-=need;lvl++;need=base+(lvl-1)*inc;}
+  return {lvl:lvl,rem:rem,need:need};
 }
-const hunterP = xp => progress(xp, 100, 60);
-const statP = xp => progress(xp, 50, 30);
+function hunterP(xp){return progress(xp,100,60);}
+function statP(xp){return progress(xp,50,30);}
 
-const DEFAULT = {
-  ready: false, name: '',
-  xp: 0, points: 0, streak: 0, best: 0, strict: false,
-  stats: { STR: 0, AGI: 0, VIT: 0, INT: 0, PER: 0 },
-  dailies: SEED_DAILIES, quests: [], shop: SEED_SHOP, bag: [],
-  lastReset: today(), history: [],
-};
-
-function rollover(d) {
-  const t = today();
-  if (d.lastReset === t) return d;
-  const mand = d.dailies.filter(q => q.mandatory);
-  const cleared = mand.length > 0 && mand.every(q => q.done);
-  const n = { ...d };
-  if (cleared) { n.streak = d.streak + 1; n.best = Math.max(d.best || 0, n.streak); }
-  else if (mand.length > 0) { n.streak = 0; if (d.strict) n.xp = Math.max(0, d.xp - 40); }
-  n.history = [...(d.history || []), {
-    date: d.lastReset,
-    done: d.dailies.filter(q => q.done).length,
-    total: d.dailies.length, cleared,
-  }].slice(-90);
-  n.dailies = d.dailies.map(q => ({ ...q, done: false }));
-  n.lastReset = t;
-  return n;
+function fresh(){
+  return {ready:false,name:'',xp:0,points:0,streak:0,best:0,strict:false,
+    stats:{STR:0,AGI:0,VIT:0,INT:0,PER:0},
+    dailies:[
+      {id:'d1',title:'20 push-ups',                stat:'STR',mandatory:true, done:false},
+      {id:'d2',title:'Walk or run for 15 minutes', stat:'AGI',mandatory:true, done:false},
+      {id:'d3',title:'In bed by a set time',       stat:'VIT',mandatory:true, done:false},
+      {id:'d4',title:'Read or study for 20 minutes',stat:'INT',mandatory:false,done:false},
+      {id:'d5',title:'5 minutes of stillness',     stat:'PER',mandatory:false,done:false}
+    ],
+    quests:[],
+    shop:[
+      {id:'s1',name:'Movie night, no guilt',cost:200, note:'Pick anything. Phone stays down.'},
+      {id:'s2',name:'Meal out at the good place',cost:500,note:''},
+      {id:'s3',name:'A full day off. No quests.',cost:1200,note:'Streak protected.'}
+    ],
+    bag:[],lastReset:today(),history:[]};
 }
 
-/* ── shell pieces ───────────────────────────────────────── */
-const cut = (n = 14) =>
-  `polygon(${n}px 0, 100% 0, 100% calc(100% - ${n}px), calc(100% - ${n}px) 100%, 0 100%, 0 ${n}px)`;
-
-function Panel({ children, glow, style, pad = 16 }) {
-  return (
-    <div style={{
-      position: 'relative', background: C.panel, padding: pad,
-      clipPath: cut(14), border: 'none',
-      boxShadow: glow ? `inset 0 0 0 1px ${C.line}, 0 0 26px rgba(77,208,255,.10)` : `inset 0 0 0 1px ${C.lineSoft}`,
-      backdropFilter: 'blur(2px)', ...style,
-    }}>{children}</div>
-  );
+function rollover(d){
+  var t=today(); if(d.lastReset===t) return d;
+  var mand=d.dailies.filter(function(q){return q.mandatory;});
+  var cleared=mand.length>0&&mand.every(function(q){return q.done;});
+  if(cleared){d.streak=d.streak+1; d.best=Math.max(d.best||0,d.streak);}
+  else if(mand.length>0){d.streak=0; if(d.strict) d.xp=Math.max(0,d.xp-40);}
+  d.history=(d.history||[]).concat([{date:d.lastReset,
+    done:d.dailies.filter(function(q){return q.done;}).length,
+    total:d.dailies.length,cleared:cleared}]).slice(-90);
+  d.dailies=d.dailies.map(function(q){q.done=false;return q;});
+  d.lastReset=t;
+  return d;
 }
 
-function Bar({ value, max, color, height = 7 }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div style={{ height, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
-      <div className="sysbar" style={{
-        width: `${pct}%`, height: '100%', background: color,
-        boxShadow: `0 0 10px ${color}`, transition: 'width .55s cubic-bezier(.2,.8,.2,1)',
-      }} />
-    </div>
-  );
+/* ─── state ────────────────────────────────────────────── */
+var D=null, TAB='status', UI={}, QUEUE=[], MODAL=false, TOASTT=null;
+
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(D)); }
+  catch(e){ toast('Could not save. If you are in private browsing, storage is blocked.',true); }
+}
+function load(){
+  var d=null;
+  try{ var raw=localStorage.getItem(KEY); if(raw) d=JSON.parse(raw); }catch(e){ d=null; }
+  var base=fresh();
+  if(d){ for(var k in d){ if(Object.prototype.hasOwnProperty.call(d,k)) base[k]=d[k]; } }
+  if(!base.stats) base.stats={STR:0,AGI:0,VIT:0,INT:0,PER:0};
+  var stale=base.lastReset!==today();
+  D=rollover(base);
+  if(stale) save();   // lock in the new day so reopening can't count it twice
 }
 
-function Btn({ children, onClick, tone = 'cyan', small, wide, disabled, title }) {
-  const col = tone === 'danger' ? C.red : tone === 'gold' ? C.amber : tone === 'ghost' ? C.mute : C.cyan;
-  return (
-    <button onClick={onClick} disabled={disabled} title={title} style={{
-      background: disabled ? 'rgba(255,255,255,.04)' : `${col}1c`,
-      color: disabled ? C.mute : col,
-      boxShadow: `inset 0 0 0 1px ${disabled ? 'rgba(255,255,255,.08)' : col + '66'}`,
-      clipPath: cut(8), padding: small ? '7px 12px' : '11px 18px',
-      fontFamily: 'Rajdhani, sans-serif', fontWeight: 600,
-      fontSize: small ? 13 : 15, letterSpacing: '.09em', textTransform: 'uppercase',
-      cursor: disabled ? 'not-allowed' : 'pointer', width: wide ? '100%' : 'auto',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-    }}>{children}</button>
-  );
+function snapshot(){
+  var s={h:hunterP(D.xp).lvl,s:{}};
+  STATS.forEach(function(x){ s.s[x.k]=statP(D.stats[x.k]).lvl; });
+  return s;
+}
+function apply(fn){
+  var before=snapshot();
+  fn(D);
+  STATS.forEach(function(x){
+    var a=statP(D.stats[x.k]).lvl;
+    if(a>before.s[x.k]) QUEUE.push({kind:'stat',stat:x,from:before.s[x.k],to:a});
+  });
+  var ah=hunterP(D.xp).lvl;
+  if(ah>before.h){
+    var rb=rankOf(before.h).r, ra=rankOf(ah).r;
+    QUEUE.push({kind:'level',from:before.h,to:ah,rankUp:ra!==rb?ra:null});
+  }
+  save(); render(); popModal();
 }
 
-const Field = props => (
-  <input {...props} style={{
-    width: '100%', background: 'rgba(255,255,255,.05)', color: C.text,
-    boxShadow: `inset 0 0 0 1px ${C.lineSoft}`, border: 'none', outline: 'none',
-    padding: '11px 13px', fontFamily: 'Rajdhani, sans-serif', fontSize: 16,
-    clipPath: cut(7), ...props.style,
-  }} />
-);
+function toast(text,bad){
+  var el=document.getElementById('toast');
+  el.textContent=text; el.className=bad?'bad':''; el.style.display='block';
+  clearTimeout(TOASTT);
+  TOASTT=setTimeout(function(){el.style.display='none';},2800);
+}
 
-const Eyebrow = ({ children, color = C.cyan }) => (
-  <div style={{
-    fontFamily: 'Chakra Petch, monospace', fontSize: 10, letterSpacing: '.3em',
-    color, textTransform: 'uppercase', opacity: .85, marginBottom: 8,
-  }}>{children}</div>
-);
+/* ─── level-up window ──────────────────────────────────── */
+function popModal(){
+  var box=document.getElementById('modal');
+  if(!QUEUE.length){ MODAL=false; box.className=''; box.innerHTML=''; return; }
+  MODAL=true;
+  var m=QUEUE.shift();
+  var accent = m.kind==='level' ? '#4dd0ff' : m.stat.c;
+  var body;
+  if(m.kind==='level'){
+    body='<div class="hd" style="font-weight:700;font-size:34px;color:#fff;letter-spacing:.06em;text-shadow:0 0 26px '+accent+'">LEVEL UP</div>'+
+      '<div style="height:14px"></div>'+
+      '<div style="display:flex;align-items:center;justify-content:center;gap:16px">'+
+        '<span class="hd" style="font-size:27px;color:var(--mute)">'+m.from+'</span>'+
+        '<span style="color:'+accent+';font-size:20px">&#9654;</span>'+
+        '<span class="hd" style="font-size:40px;color:'+accent+';text-shadow:0 0 20px '+accent+'">'+m.to+'</span>'+
+      '</div>'+
+      (m.rankUp?'<div style="margin-top:20px;padding-top:16px;box-shadow:inset 0 1px 0 var(--lineSoft);font-size:17px;color:var(--amber)">You have advanced to <strong>Rank '+m.rankUp+'</strong>.</div>':'');
+  } else {
+    body='<div class="hd" style="font-weight:700;font-size:25px;color:#fff;letter-spacing:.04em">'+
+        m.stat.name.toUpperCase()+' +'+(m.to-m.from)+'</div>'+
+      '<div style="height:12px"></div>'+
+      '<div class="hd" style="font-size:34px;color:'+accent+';text-shadow:0 0 20px '+accent+'">'+m.stat.k+' '+m.to+'</div>';
+  }
+  box.innerHTML='<div class="win" style="box-shadow:inset 0 0 0 1px '+accent+'88,0 0 60px '+accent+'33">'+
+    '<div class="mono" style="font-size:10.5px;letter-spacing:.42em;color:'+accent+';opacity:.9">NOTIFICATION</div>'+
+    '<div style="height:18px"></div>'+body+
+    '<div style="height:26px"></div>'+
+    '<button class="btn wide" data-act="closemodal">Confirm</button></div>';
+  box.className='on';
+}
 
-/* ────────────────────────────────────────────────────────── */
-export default function App() {
-  const [d, setD] = useState(null);
-  const [tab, setTab] = useState('status');
-  const [modal, setModal] = useState(null);   // big system window
-  const [toast, setToast] = useState(null);
-  const queue = useRef([]);
-  const [nameIn, setNameIn] = useState('');
+/* ─── small builders ───────────────────────────────────── */
+function bar(v,max,color,tall){
+  var pct=max>0?Math.min(100,(v/max)*100):0;
+  return '<div class="bar'+(tall?' tall':'')+'"><i style="width:'+pct+'%;background:'+color+';box-shadow:0 0 10px '+color+'"></i></div>';
+}
+function statPicker(sel,ns){
+  var h='<div class="five">';
+  STATS.forEach(function(s){
+    var on=sel===s.k;
+    h+='<button class="pick" data-act="pickstat" data-ns="'+ns+'" data-v="'+s.k+'" style="'+
+      (on?'background:'+s.c+'22;box-shadow:inset 0 0 0 1px '+s.c+'88;color:'+s.c:'')+'">'+
+      I[s.ico]+'<span class="hd" style="font-size:10px;letter-spacing:.1em">'+s.k+'</span></button>';
+  });
+  h+='</div><div class="mute" style="font-size:13px;margin-top:7px;line-height:1.35">'+
+     SM[sel].name+' &mdash; '+SM[sel].hint+'</div>';
+  return h;
+}
 
-  useEffect(() => {
-    (async () => {
-      let loaded = null;
-      try {
-        const r = await window.storage.get(KEY, false);
-        if (r && r.value) loaded = JSON.parse(r.value);
-      } catch (e) { loaded = null; }
-      setD(rollover({ ...DEFAULT, ...(loaded || {}) }));
-    })();
-  }, []);
+/* ─── views ────────────────────────────────────────────── */
+function viewStatus(){
+  var hp=hunterP(D.xp);
+  var cleared=(D.history||[]).filter(function(h){return h.cleared;}).length;
+  var h='<div class="panel glow"><div class="eyebrow">Status</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">'+
+      '<span class="hd" style="font-size:15px;letter-spacing:.06em">EXPERIENCE</span>'+
+      '<span class="mute" style="font-size:14px">'+hp.rem+' / '+hp.need+'</span></div>'+
+    bar(hp.rem,hp.need,'#4dd0ff',true)+'<div style="margin-top:20px;display:grid;gap:14px">';
+  STATS.forEach(function(s){
+    var p=statP(D.stats[s.k]);
+    h+='<div><div class="row" style="gap:9px;margin-bottom:6px"><span style="color:'+s.c+'">'+I[s.ico]+'</span>'+
+      '<span class="hd" style="font-size:13px;letter-spacing:.16em;width:38px">'+s.k+'</span>'+
+      '<span class="mute flex1" style="font-size:14px">'+s.name+'</span>'+
+      '<span class="hd" style="font-size:16px;color:'+s.c+';font-weight:600">'+p.lvl+'</span></div>'+
+      bar(p.rem,p.need,s.c)+'</div>';
+  });
+  h+='</div></div><div class="sp"></div><div class="three">';
+  [['Best streak',D.best||0],['Days cleared',cleared],['Quests done',D.quests.filter(function(q){return q.done;}).length]]
+   .forEach(function(x){
+    h+='<div class="panel p13"><div class="hd" style="font-size:23px">'+x[1]+'</div>'+
+       '<div class="mute" style="font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;margin-top:2px">'+x[0]+'</div></div>';
+  });
+  h+='</div><div class="sp"></div><div class="panel"><div class="eyebrow">Last 14 days</div><div class="spark">';
+  var hist=(D.history||[]).slice(-14);
+  for(var i=0;i<14;i++){
+    var e=hist[i], ratio=e&&e.total?e.done/e.total:0;
+    var col=!e?'rgba(255,255,255,.06)':(e.cleared?'#4dd0ff':'#7d95b5');
+    h+='<div><i style="height:'+Math.max(6,ratio*100)+'%;background:'+col+
+       (e&&e.cleared?';box-shadow:0 0 8px #4dd0ff':'')+'"></i></div>';
+  }
+  h+='</div></div><div class="sp"></div>'+
+   '<div class="panel p14"><label class="chk"><input type="checkbox" data-act="strict"'+(D.strict?' checked':'')+'>'+
+   '<span><span style="display:block">Penalty mode</span>'+
+   '<span class="mute" style="display:block;font-size:13px;line-height:1.35">Miss a required quest and lose 40 XP on top of the streak. Off by default &mdash; a broken streak is usually feedback enough.</span></span></label></div>'+
+   '<div class="sp"></div><button class="btn wide ghost" data-act="reset">Erase all data</button>';
+  return h;
+}
 
-  const persist = async next => {
-    try { await window.storage.set(KEY, JSON.stringify(next), false); }
-    catch (e) { setToast({ text: 'Could not save. Your last action may be lost.', bad: true }); }
-  };
+function viewDaily(){
+  var mand=D.dailies.filter(function(q){return q.mandatory;});
+  var left=mand.filter(function(q){return !q.done;}).length;
+  var doneCount=D.dailies.filter(function(q){return q.done;}).length;
+  var h='<div class="panel glow"><div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+    '<div><div class="eyebrow" style="color:'+(left?'var(--red)':'var(--green)')+'">Daily Quest &mdash; '+(left?'Incomplete':'Complete')+'</div>'+
+    '<div class="hd" style="font-size:19px">'+doneCount+' / '+D.dailies.length+' finished</div></div>'+
+    '<div class="mute" style="text-align:right;font-size:13px">Resets<br>at midnight</div></div>'+
+    (left?'<div class="row" style="gap:8px;margin-top:12px;color:var(--amber);font-size:14px">'+I.alert+
+      left+' required quest'+(left===1?'':'s')+' left to keep the streak.</div>':'')+
+    '</div><div class="sp"></div><div class="stack">';
 
-  const pushModal = m => { queue.current.push(m); if (!modal) setModal(queue.current.shift()); };
-  const nextModal = () => setModal(queue.current.length ? queue.current.shift() : null);
-  const fireToast = t => { setToast(t); setTimeout(() => setToast(null), 2600); };
+  D.dailies.forEach(function(q){
+    var st=SM[q.stat];
+    h+='<div class="panel p0"><div style="display:flex;align-items:stretch">'+
+      '<button class="check'+(q.done?' on':'')+'" data-act="daily" data-id="'+q.id+'" aria-label="Toggle">'+
+        '<span class="box" style="box-shadow:inset 0 0 0 1.5px '+(q.done?'#4dd0ff':'rgba(255,255,255,.22)')+
+        ';background:'+(q.done?'rgba(77,208,255,.2)':'transparent')+'">'+(q.done?I.check:'')+'</span></button>'+
+      '<div class="flex1" style="padding:12px">'+
+        '<div style="font-size:16.5px;line-height:1.25;'+(q.done?'color:var(--mute);text-decoration:line-through':'')+'">'+esc(q.title)+'</div>'+
+        '<div class="row" style="gap:9px;margin-top:5px">'+
+          '<span class="tag" style="color:'+st.c+'">'+I[st.ico]+q.stat+'</span>'+
+          '<button class="linkish" data-act="mand" data-id="'+q.id+'" style="color:'+(q.mandatory?'var(--red)':'rgba(255,255,255,.25)')+'">'+
+            (q.mandatory?'&#9679; REQUIRED':'&#9675; OPTIONAL')+'</button>'+
+        '</div></div>'+
+      '<button class="icobtn" data-act="deldaily" data-id="'+q.id+'" aria-label="Delete">'+I.trash+'</button>'+
+      '</div></div>';
+  });
+  h+='</div><div class="sp8"></div>';
 
-  // central mutation: applies changes, detects level-ups, saves
-  const apply = mutate => {
-    setD(prev => {
-      const before = { h: hunterP(prev.xp).lvl, s: Object.fromEntries(STATS.map(x => [x.k, statP(prev.stats[x.k]).lvl])) };
-      const next = mutate({ ...prev, stats: { ...prev.stats } });
-      const afterH = hunterP(next.xp).lvl;
-      STATS.forEach(x => {
-        const a = statP(next.stats[x.k]).lvl;
-        if (a > before.s[x.k]) pushModal({ kind: 'stat', stat: x, from: before.s[x.k], to: a });
-      });
-      if (afterH > before.h) {
-        const rb = rankOf(before.h).r, ra = rankOf(afterH).r;
-        pushModal({ kind: 'level', from: before.h, to: afterH, rankUp: ra !== rb ? ra : null });
-      }
-      persist(next);
-      return next;
+  if(!UI.dOpen){
+    h+='<button class="btn wide ghost" data-act="opendaily">'+I.plus+'Add a daily quest</button>';
+  } else {
+    h+='<div class="panel glow"><div class="eyebrow">New daily quest</div>'+
+      '<input class="field" data-ui="dTitle" value="'+esc(UI.dTitle||'')+'" placeholder="e.g. Drink 8 glasses of water">'+
+      '<div class="sp8"></div>'+statPicker(UI.dStat||'STR','d')+
+      '<div class="sp8"></div>'+
+      '<label class="chk"><input type="checkbox" data-ui="dMand"'+(UI.dMand?' checked':'')+'>'+
+      '<span>Required &mdash; missing it breaks the streak</span></label>'+
+      '<div class="sp"></div><div class="row" style="gap:9px">'+
+      '<button class="btn" data-act="adddaily">Add quest</button>'+
+      '<button class="btn ghost" data-act="canceldaily">Cancel</button></div></div>';
+  }
+  return h;
+}
+
+function questCard(q){
+  var st=SM[q.stat], rw=DIFF[q.rank], rc=rankColor(q.rank);
+  var ex=UI.expand===q.id;
+  var sd=q.steps.filter(function(x){return x.done;}).length;
+  var h='<div class="panel p14"'+(q.done?' style="opacity:.45"':'')+'>'+
+    '<div style="display:flex;gap:11px;align-items:flex-start">'+
+    '<div class="hex" style="width:31px;height:31px;flex-shrink:0;background:'+rc+'22;color:'+rc+';font-size:14px">'+q.rank+'</div>'+
+    '<div class="flex1"><div style="font-size:17px;line-height:1.25">'+esc(q.title)+'</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-family:\'Chakra Petch\',sans-serif;font-size:10.5px;letter-spacing:.11em">'+
+      '<span style="color:'+st.c+';display:inline-flex;gap:4px;align-items:center">'+I[st.ico]+q.stat+'</span>'+
+      '<span style="color:var(--amber)">+'+rw.xp+' XP &middot; +'+rw.p+' PTS</span>'+
+      (q.due?'<span class="mute">BY '+esc(q.due)+'</span>':'')+
+      (q.steps.length?'<span class="mute">'+sd+'/'+q.steps.length+' STEPS</span>':'')+
+    '</div></div>'+
+    '<button class="icobtn" style="padding:2px;color:var(--mute)" data-act="expand" data-id="'+q.id+'" aria-label="Expand">'+
+      '<span style="display:block;transform:rotate('+(ex?180:0)+'deg)">'+I.chev+'</span></button></div>';
+
+  if(ex){
+    h+='<div style="margin-top:13px;padding-top:13px;box-shadow:inset 0 1px 0 var(--lineSoft)">';
+    q.steps.forEach(function(s,i){
+      h+='<button data-act="step" data-id="'+q.id+'" data-i="'+i+'" style="display:flex;gap:9px;align-items:center;width:100%;background:none;border:0;cursor:pointer;padding:6px 0;text-align:left">'+
+        '<span class="box" style="width:15px;height:15px;flex-shrink:0;color:#4dd0ff;box-shadow:inset 0 0 0 1.5px '+
+        (s.done?'#4dd0ff':'rgba(255,255,255,.22)')+';background:'+(s.done?'rgba(77,208,255,.2)':'transparent')+'">'+
+        (s.done?I.check:'')+'</span>'+
+        '<span style="font-size:15px;'+(s.done?'color:var(--mute);text-decoration:line-through':'')+'">'+esc(s.t)+'</span></button>';
     });
-  };
+    if(!q.done){
+      h+='<div class="row" style="gap:7px;margin-top:9px">'+
+        '<input class="field" data-ui="stepTxt" value="'+esc(UI.stepTxt||'')+'" placeholder="Add a step">'+
+        '<button class="btn small ghost" data-act="addstep" data-id="'+q.id+'">'+I.plus+'</button></div>'+
+        '<div class="row" style="gap:9px;margin-top:13px">'+
+        '<button class="btn small gold" data-act="finish" data-id="'+q.id+'">'+I.trophy+'Complete</button>'+
+        '<button class="btn small ghost" data-act="delquest" data-id="'+q.id+'">'+I.trash+'Delete</button></div>';
+    }
+    h+='</div>';
+  }
+  return h+'</div>';
+}
 
-  if (!d) return <Boot />;
+function viewQuests(){
+  var active=D.quests.filter(function(q){return !q.done;});
+  var done=D.quests.filter(function(q){return q.done;});
+  var h='<div class="panel glow"><div class="eyebrow">Quests</div>'+
+    '<p class="mute" style="font-size:15.5px;margin:0;line-height:1.45">Bigger objectives with a deadline. Set the rank honestly &mdash; an S-rank should scare you a little.</p></div>'+
+    '<div class="sp8"></div><div class="stack">'+active.map(questCard).join('')+'</div>';
+  if(!active.length) h+='<div class="panel p18"><div class="mute" style="text-align:center;font-size:15.5px">No active quests. Name the thing you keep putting off.</div></div>';
+  h+='<div class="sp8"></div>';
 
-  /* ── onboarding ── */
-  if (!d.ready) {
-    return (
-      <Frame>
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
-          <div style={{ width: '100%', maxWidth: 460 }}>
-            <Panel glow pad={26}>
-              <Eyebrow>Notification</Eyebrow>
-              <h1 style={{
-                fontFamily: 'Chakra Petch, sans-serif', fontSize: 27, lineHeight: 1.15,
-                color: C.text, margin: '0 0 14px', fontWeight: 700,
-              }}>You have acquired the qualifications to be a Player.</h1>
-              <p style={{ color: C.mute, fontFamily: 'Rajdhani, sans-serif', fontSize: 17, lineHeight: 1.5, margin: '0 0 22px' }}>
-                Five stats. Daily quests you write yourself. Points you spend on things you
-                actually want. Nobody else can see this window.
-              </p>
-              <Eyebrow>Enter your name</Eyebrow>
-              <Field value={nameIn} onChange={e => setNameIn(e.target.value)} placeholder="Name" maxLength={22}
-                onKeyDown={e => { if (e.key === 'Enter' && nameIn.trim()) apply(p => ({ ...p, ready: true, name: nameIn.trim() })); }} />
-              <div style={{ height: 16 }} />
-              <Btn wide disabled={!nameIn.trim()} onClick={() => apply(p => ({ ...p, ready: true, name: nameIn.trim() }))}>
-                Accept
-              </Btn>
-            </Panel>
-          </div>
-        </div>
-      </Frame>
-    );
+  if(!UI.qOpen){
+    h+='<button class="btn wide ghost" data-act="openquest">'+I.plus+'Accept a new quest</button>';
+  } else {
+    var r=UI.qRank||'C';
+    h+='<div class="panel glow"><div class="eyebrow">New quest</div>'+
+      '<input class="field" data-ui="qTitle" value="'+esc(UI.qTitle||'')+'" placeholder="e.g. Save 3 months of expenses">'+
+      '<div class="sp8"></div>'+statPicker(UI.qStat||'INT','q')+
+      '<div class="sp8"></div><div class="eyebrow">Difficulty</div><div class="six">';
+    ['E','D','C','B','A','S'].forEach(function(x){
+      var on=r===x,rc=rankColor(x);
+      h+='<button class="pick hd" data-act="pickrank" data-v="'+x+'" style="font-size:15px;font-weight:600;padding:10px 0;'+
+        (on?'background:'+rc+'25;box-shadow:inset 0 0 0 1px '+rc+'88;color:'+rc:'')+'">'+x+'</button>';
+    });
+    h+='</div><div class="mute" style="font-size:13px;margin-top:7px">Reward: +'+DIFF[r].xp+' XP and +'+DIFF[r].p+' points</div>'+
+      '<div class="sp8"></div><div class="eyebrow">Deadline (optional)</div>'+
+      '<input class="field" type="date" data-ui="qDue" value="'+esc(UI.qDue||'')+'">'+
+      '<div class="sp"></div><div class="row" style="gap:9px">'+
+      '<button class="btn" data-act="addquest">Accept</button>'+
+      '<button class="btn ghost" data-act="cancelquest">Cancel</button></div></div>';
+  }
+  if(done.length) h+='<div class="sp20"></div><div class="eyebrow" style="color:var(--mute)">Cleared</div><div class="stack">'+done.map(questCard).join('')+'</div>';
+  return h;
+}
+
+function viewShop(){
+  var mode=UI.shopTab||'rewards';
+  var h='<div class="panel glow"><div class="row" style="justify-content:space-between">'+
+    '<div><div class="eyebrow" style="color:var(--amber)">Shop</div>'+
+    '<div class="hd" style="font-size:21px;color:var(--amber)">'+D.points.toLocaleString()+' points</div></div>'+
+    '<span style="color:var(--amber);opacity:.5">'+svg('<circle cx="9" cy="9" r="5"/><path d="M13.5 5.2A5 5 0 1 1 16 15.5"/>',null,28)+'</span></div></div>'+
+    '<div class="sp8"></div><div class="row" style="gap:8px">'+
+    '<button class="btn small wide'+(mode==='rewards'?'':' ghost')+'" data-act="shoptab" data-v="rewards">Your rewards</button>'+
+    '<button class="btn small wide'+(mode==='medals'?'':' ghost')+'" data-act="shoptab" data-v="medals">Medals</button></div>'+
+    '<div class="sp8"></div>';
+
+  if(mode==='rewards'){
+    h+='<div class="stack">';
+    D.shop.forEach(function(it){
+      var can=D.points>=it.cost;
+      h+='<div class="panel p14"><div class="row" style="gap:11px">'+
+        '<div class="flex1"><div style="font-size:17px;line-height:1.25">'+esc(it.name)+'</div>'+
+        (it.note?'<div class="mute" style="font-size:13.5px;margin-top:3px">'+esc(it.note)+'</div>':'')+
+        '<div class="hd" style="font-size:12px;color:var(--amber);margin-top:5px;letter-spacing:.1em">'+it.cost+' PTS</div></div>'+
+        '<button class="btn small '+(can?'gold':'ghost')+'" data-act="buyreward" data-id="'+it.id+'"'+(can?'':' disabled')+'>'+
+        (can?'Buy':I.lock)+'</button>'+
+        '<button class="icobtn" data-act="delreward" data-id="'+it.id+'" aria-label="Delete">'+I.trash+'</button>'+
+        '</div></div>';
+    });
+    h+='</div><div class="sp8"></div>';
+    if(!UI.rOpen){
+      h+='<button class="btn wide ghost" data-act="openreward">'+I.plus+'Add a reward</button>';
+    } else {
+      h+='<div class="panel glow"><div class="eyebrow">New reward</div>'+
+        '<input class="field" data-ui="rName" value="'+esc(UI.rName||'')+'" placeholder="What do you actually want?">'+
+        '<div class="sp8"></div><input class="field" inputmode="numeric" data-ui="rCost" value="'+esc(UI.rCost||'')+'" placeholder="Cost in points">'+
+        '<div class="sp8"></div><input class="field" data-ui="rNote" value="'+esc(UI.rNote||'')+'" placeholder="Any rules for it (optional)">'+
+        '<div class="sp"></div><div class="row" style="gap:9px">'+
+        '<button class="btn" data-act="addreward">Add to shop</button>'+
+        '<button class="btn ghost" data-act="cancelreward">Cancel</button></div></div>';
+    }
+  } else {
+    h+='<div class="medals">';
+    MEDALS.forEach(function(m){
+      var can=D.points>=m.cost;
+      var owned=D.bag.filter(function(b){return b.refId===m.id;}).length;
+      h+='<div class="panel p13"><div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<div style="font-size:27px;color:'+m.color+';line-height:1;text-shadow:0 0 14px '+m.color+'88">'+m.sym+'</div>'+
+        (owned?'<div class="hd mute" style="font-size:11px">&times;'+owned+'</div>':'')+'</div>'+
+        '<div style="font-size:15px;margin-top:8px;line-height:1.2">'+m.name+'</div>'+
+        '<div class="hd" style="font-size:9.5px;letter-spacing:.18em;color:'+m.color+';margin-top:3px;opacity:.8">'+m.tier.toUpperCase()+'</div>'+
+        '<div class="mute" style="font-size:12.5px;margin-top:6px;line-height:1.3;min-height:32px">'+m.desc+'</div>'+
+        '<div class="sp8"></div>'+
+        '<button class="btn small wide '+(can?'gold':'ghost')+'" data-act="buymedal" data-id="'+m.id+'"'+(can?'':' disabled')+'>'+
+        (can?m.cost+' pts':I.lock+m.cost)+'</button></div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+function viewBag(){
+  var medals=D.bag.filter(function(b){return b.kind==='medal';});
+  var rewards=D.bag.filter(function(b){return b.kind==='reward';});
+  var unclaimed=rewards.filter(function(r){return !r.used;}).length;
+  var h='<div class="panel glow"><div class="eyebrow">Inventory</div>'+
+    '<div class="hd" style="font-size:19px">'+medals.length+' medal'+(medals.length===1?'':'s')+
+    ' &middot; '+unclaimed+' unclaimed reward'+(unclaimed===1?'':'s')+'</div></div>'+
+    '<div class="sp"></div><div class="eyebrow" style="color:var(--mute)">Rewards</div><div class="stack">';
+  if(!rewards.length) h+='<div class="panel p18"><div class="mute" style="text-align:center;font-size:15px">Nothing bought yet. Points are no good sitting there.</div></div>';
+  rewards.forEach(function(b){
+    h+='<div class="panel p13"'+(b.used?' style="opacity:.45"':'')+'><div class="row">'+
+      '<div class="flex1"><div style="font-size:16px">'+esc(b.name)+'</div>'+
+      '<div class="hd mute" style="font-size:10.5px;letter-spacing:.12em;margin-top:3px">'+
+        (b.used?'CLAIMED':'BOUGHT '+esc(b.at))+'</div></div>'+
+      (b.used?'':'<button class="btn small" data-act="claim" data-uid="'+b.uid+'">Claim it</button>'+
+        '<button class="btn small ghost" data-act="sell" data-uid="'+b.uid+'">Sell</button>')+
+      '</div></div>';
+  });
+  h+='</div><div class="sp"></div><div class="eyebrow" style="color:var(--mute)">Medal case</div>';
+  if(!medals.length){
+    h+='<div class="panel p18"><div class="mute" style="text-align:center;font-size:15px">Empty case.</div></div>';
+  } else {
+    h+='<div class="panel" style="padding:16px"><div class="case">';
+    medals.forEach(function(b){
+      h+='<button data-act="sell" data-uid="'+b.uid+'" title="Sell for '+Math.floor(b.cost/2)+' pts" '+
+        'style="background:none;border:0;cursor:pointer;padding:0;text-align:center">'+
+        '<div style="font-size:31px;color:'+b.color+';text-shadow:0 0 16px '+b.color+'99;line-height:1">'+b.sym+'</div>'+
+        '<div class="mute" style="font-size:11.5px;margin-top:5px;line-height:1.2">'+esc(b.name)+'</div></button>';
+    });
+    h+='</div></div>';
+  }
+  return h;
+}
+
+function viewOnboard(){
+  return '<div style="min-height:82vh;display:flex;align-items:center"><div style="width:100%">'+
+    '<div class="panel glow" style="padding:26px"><div class="eyebrow">Notification</div>'+
+    '<h1 class="hd" style="font-size:27px;line-height:1.15;margin:0 0 14px;font-weight:700">You have acquired the qualifications to be a Player.</h1>'+
+    '<p class="mute" style="font-size:17px;line-height:1.5;margin:0 0 22px">Five stats. Daily quests you write yourself. Points you spend on things you actually want. Everything stays on this device.</p>'+
+    '<div class="eyebrow">Enter your name</div>'+
+    '<input class="field" data-ui="oName" maxlength="22" value="'+esc(UI.oName||'')+'" placeholder="Name">'+
+    '<div class="sp"></div><button class="btn wide" data-act="accept">Accept</button></div></div></div>';
+}
+
+/* ─── render ───────────────────────────────────────────── */
+function render(){
+  var app=document.getElementById('app'), nav=document.getElementById('nav');
+  if(!D.ready){ app.innerHTML=viewOnboard(); nav.innerHTML=''; nav.style.display='none'; focusRestore(); return; }
+  nav.style.display='flex';
+
+  var hp=hunterP(D.xp), rk=rankOf(hp.lvl);
+  var left=D.dailies.filter(function(q){return q.mandatory&&!q.done;}).length;
+
+  var head='<div class="row" style="gap:12px;margin-bottom:14px">'+
+    '<div class="hex" style="width:46px;height:46px;flex-shrink:0;background:'+rk.c+'22;box-shadow:0 0 18px '+rk.c+'44;font-size:21px;color:'+rk.c+'">'+rk.r+'</div>'+
+    '<div class="flex1"><div class="hd" style="font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(D.name)+'</div>'+
+    '<div class="mute" style="font-size:13px;letter-spacing:.14em">LEVEL '+hp.lvl+' &middot; RANK '+rk.r+'</div></div>'+
+    '<div style="text-align:right">'+
+      '<div class="hd" style="display:flex;align-items:center;gap:5px;justify-content:flex-end;color:var(--amber);font-size:17px;font-weight:600">'+I.coins+D.points.toLocaleString()+'</div>'+
+      '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;font-size:13px;color:'+(D.streak?'var(--red)':'var(--mute)')+'">'+I.flame+D.streak+' day'+(D.streak===1?'':'s')+'</div>'+
+    '</div></div>';
+
+  var body = TAB==='status'?viewStatus():TAB==='daily'?viewDaily():
+             TAB==='quests'?viewQuests():TAB==='shop'?viewShop():viewBag();
+  app.innerHTML=head+body;
+
+  var tabs=[['status','Status','user'],['daily','Daily','target'],['quests','Quests','scroll'],
+            ['shop','Shop','store'],['bag','Bag','bag']];
+  nav.innerHTML='<div>'+tabs.map(function(t){
+    return '<button class="'+(TAB===t[0]?'on':'')+'" data-act="tab" data-v="'+t[0]+'">'+I[t[2]]+
+      '<span>'+t[1]+'</span>'+(t[0]==='daily'&&left?'<span class="dot"></span>':'')+'</button>';
+  }).join('')+'</div>';
+  focusRestore();
+}
+
+var FOCUS=null;
+function focusRestore(){
+  if(!FOCUS) return;
+  var el=document.querySelector('[data-ui="'+FOCUS+'"]');
+  if(el){ el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} }
+  FOCUS=null;
+}
+
+/* ─── actions ──────────────────────────────────────────── */
+function toggleDaily(id){
+  apply(function(d){
+    var q=null,i;
+    for(i=0;i<d.dailies.length;i++) if(d.dailies[i].id===id) q=d.dailies[i];
+    if(!q) return;
+    var allBefore=d.dailies.length>0&&d.dailies.every(function(x){return x.done;});
+    q.done=!q.done;
+    var on=q.done, delta=on?15:-15;
+    d.xp=Math.max(0,d.xp+delta);
+    d.points=Math.max(0,d.points+(on?10:-10));
+    d.stats[q.stat]=Math.max(0,d.stats[q.stat]+delta);
+    var allNow=d.dailies.length>0&&d.dailies.every(function(x){return x.done;});
+    if(allNow&&!allBefore){ d.xp+=50; d.points+=50; toast('Daily quests cleared. +50 XP  +50 pts'); }
+    if(!allNow&&allBefore){ d.xp=Math.max(0,d.xp-50); d.points=Math.max(0,d.points-50); }
+  });
+}
+
+function handle(act,el){
+  var id=el.getAttribute('data-id'), v=el.getAttribute('data-v'), u=el.getAttribute('data-uid');
+
+  if(act==='tab'){ TAB=v; UI.expand=null; render(); return; }
+  if(act==='closemodal'){ popModal(); return; }
+
+  if(act==='accept'){
+    var n=(UI.oName||'').trim(); if(!n){ toast('Enter a name first.',true); return; }
+    apply(function(d){ d.ready=true; d.name=n; }); return;
   }
 
-  const hp = hunterP(d.xp);
-  const rank = rankOf(hp.lvl);
-  const mand = d.dailies.filter(q => q.mandatory);
-  const mandLeft = mand.filter(q => !q.done).length;
+  if(act==='daily'){ toggleDaily(id); return; }
+  if(act==='mand'){ apply(function(d){ d.dailies.forEach(function(q){ if(q.id===id) q.mandatory=!q.mandatory; }); }); return; }
+  if(act==='deldaily'){ apply(function(d){ d.dailies=d.dailies.filter(function(q){return q.id!==id;}); }); return; }
+  if(act==='opendaily'){ UI.dOpen=true; UI.dStat=UI.dStat||'STR'; render(); return; }
+  if(act==='canceldaily'){ UI.dOpen=false; UI.dTitle=''; UI.dMand=false; render(); return; }
+  if(act==='adddaily'){
+    var t=(UI.dTitle||'').trim(); if(!t){ toast('Give the quest a name.',true); return; }
+    var st=UI.dStat||'STR', mn=!!UI.dMand;
+    UI.dOpen=false; UI.dTitle=''; UI.dMand=false;
+    apply(function(d){ d.dailies.push({id:uid(),title:t,stat:st,mandatory:mn,done:false}); }); return;
+  }
+  if(act==='pickstat'){ UI[el.getAttribute('data-ns')+'Stat']=v; render(); return; }
+  if(act==='pickrank'){ UI.qRank=v; render(); return; }
 
-  /* ── actions ── */
-  const toggleDaily = id => apply(p => {
-    const q = p.dailies.find(x => x.id === id);
-    if (!q) return p;
-    const on = !q.done;
-    const dl = p.dailies.map(x => x.id === id ? { ...x, done: on } : x);
-    let xp = p.xp + (on ? 15 : -15);
-    let pts = p.points + (on ? 10 : -10);
-    const stats = { ...p.stats, [q.stat]: Math.max(0, p.stats[q.stat] + (on ? 15 : -15)) };
-    // full-clear bonus
-    const allNow = dl.length > 0 && dl.every(x => x.done);
-    const allBefore = p.dailies.length > 0 && p.dailies.every(x => x.done);
-    if (allNow && !allBefore) { xp += 50; pts += 50; fireToast({ text: 'Daily quests cleared. +50 XP  +50 pts' }); }
-    if (!allNow && allBefore) { xp -= 50; pts -= 50; }
-    return { ...p, dailies: dl, xp: Math.max(0, xp), points: Math.max(0, pts), stats };
-  });
-
-  const addDaily = (title, stat, mandatory) =>
-    apply(p => ({ ...p, dailies: [...p.dailies, { id: uid(), title, stat, mandatory, done: false }] }));
-  const delDaily = id => apply(p => ({ ...p, dailies: p.dailies.filter(x => x.id !== id) }));
-  const flipMand = id => apply(p => ({ ...p, dailies: p.dailies.map(x => x.id === id ? { ...x, mandatory: !x.mandatory } : x) }));
-
-  const addQuest = q => apply(p => ({ ...p, quests: [...p.quests, q] }));
-  const delQuest = id => apply(p => ({ ...p, quests: p.quests.filter(x => x.id !== id) }));
-  const stepFlip = (qid, i) => apply(p => ({
-    ...p, quests: p.quests.map(q => q.id !== qid ? q :
-      { ...q, steps: q.steps.map((s, j) => j === i ? { ...s, done: !s.done } : s) })
-  }));
-  const addStep = (qid, t) => apply(p => ({
-    ...p, quests: p.quests.map(q => q.id !== qid ? q : { ...q, steps: [...q.steps, { t, done: false }] })
-  }));
-  const finishQuest = id => apply(p => {
-    const q = p.quests.find(x => x.id === id);
-    if (!q || q.done) return p;
-    const r = DIFF[q.rank];
-    fireToast({ text: `Quest complete. +${r.xp} XP  +${r.p} pts` });
-    return {
-      ...p, xp: p.xp + r.xp, points: p.points + r.p,
-      stats: { ...p.stats, [q.stat]: p.stats[q.stat] + r.xp },
-      quests: p.quests.map(x => x.id === id ? { ...x, done: true, doneAt: today() } : x),
-    };
-  });
-
-  const buy = item => apply(p => {
-    if (p.points < item.cost) return p;
-    fireToast({ text: `Acquired: ${item.name}` });
-    return {
-      ...p, points: p.points - item.cost,
-      bag: [...p.bag, { uid: uid(), refId: item.id, name: item.name, cost: item.cost, sym: item.sym || null, color: item.color || C.cyan, kind: item.sym ? 'medal' : 'reward', at: today(), used: false }],
-    };
-  });
-  const useItem = u => apply(p => ({ ...p, bag: p.bag.map(x => x.uid === u ? { ...x, used: true } : x) }));
-  const sellItem = u => apply(p => {
-    const it = p.bag.find(x => x.uid === u); if (!it) return p;
-    const back = Math.floor(it.cost / 2);
-    fireToast({ text: `Sold. +${back} pts` });
-    return { ...p, points: p.points + back, bag: p.bag.filter(x => x.uid !== u) };
-  });
-  const addReward = (name, cost, note) => apply(p => ({ ...p, shop: [...p.shop, { id: uid(), name, cost, note }] }));
-  const delReward = id => apply(p => ({ ...p, shop: p.shop.filter(x => x.id !== id) }));
-
-  const TABS = [
-    { k: 'status', label: 'Status', icon: User },
-    { k: 'daily', label: 'Daily', icon: Target },
-    { k: 'quests', label: 'Quests', icon: ScrollText },
-    { k: 'shop', label: 'Shop', icon: Store },
-    { k: 'bag', label: 'Bag', icon: Package },
-  ];
-
-  return (
-    <Frame>
-      <div style={{ maxWidth: 560, margin: '0 auto', padding: '18px 15px 104px' }}>
-
-        {/* header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          <div style={{
-            width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center',
-            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
-            background: `${rank.c}22`, boxShadow: `0 0 18px ${rank.c}44`,
-            fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 21, color: rank.c,
-          }}>{rank.r}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 18, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
-            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, letterSpacing: '.14em' }}>
-              LEVEL {hp.lvl} · RANK {rank.r}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', color: C.amber, fontFamily: 'Chakra Petch, sans-serif', fontSize: 17, fontWeight: 600 }}>
-              <Coins size={15} />{d.points.toLocaleString()}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', color: d.streak > 0 ? C.red : C.mute, fontFamily: 'Rajdhani, sans-serif', fontSize: 13 }}>
-              <Flame size={13} />{d.streak} day{d.streak === 1 ? '' : 's'}
-            </div>
-          </div>
-        </div>
-
-        {tab === 'status' && <Status d={d} hp={hp} rank={rank} apply={apply} />}
-        {tab === 'daily' && <Daily d={d} mandLeft={mandLeft} toggle={toggleDaily} add={addDaily} del={delDaily} flip={flipMand} />}
-        {tab === 'quests' && <Quests d={d} add={addQuest} del={delQuest} finish={finishQuest} stepFlip={stepFlip} addStep={addStep} />}
-        {tab === 'shop' && <Shop d={d} buy={buy} addReward={addReward} delReward={delReward} />}
-        {tab === 'bag' && <Bag d={d} useItem={useItem} sellItem={sellItem} />}
-      </div>
-
-      {/* bottom nav */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-        background: 'rgba(4,7,15,.93)', boxShadow: `inset 0 1px 0 ${C.lineSoft}`,
-        backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}>
-        <div style={{ display: 'flex', width: '100%', maxWidth: 560 }}>
-          {TABS.map(t => {
-            const on = tab === t.k;
-            const I = t.icon;
-            const badge = t.k === 'daily' && mandLeft > 0;
-            return (
-              <button key={t.k} onClick={() => setTab(t.k)} style={{
-                flex: 1, background: 'none', border: 'none', cursor: 'pointer',
-                padding: '11px 0 13px', color: on ? C.cyan : C.mute, position: 'relative',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              }}>
-                {on && <div style={{ position: 'absolute', top: 0, left: '26%', right: '26%', height: 2, background: C.cyan, boxShadow: `0 0 10px ${C.cyan}` }} />}
-                <I size={19} />
-                <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>{t.label}</span>
-                {badge && <span style={{ position: 'absolute', top: 8, right: '26%', width: 7, height: 7, borderRadius: '50%', background: C.red, boxShadow: `0 0 8px ${C.red}` }} />}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
-          background: 'rgba(7,13,28,.96)', color: toast.bad ? C.red : C.cyan, padding: '11px 18px',
-          clipPath: cut(9), boxShadow: `inset 0 0 0 1px ${toast.bad ? C.red + '66' : C.line}`,
-          fontFamily: 'Rajdhani, sans-serif', fontSize: 15, letterSpacing: '.04em',
-          maxWidth: '88vw', textAlign: 'center',
-        }}>{toast.text}</div>
-      )}
-
-      {modal && <SystemWindow m={modal} onClose={nextModal} />}
-    </Frame>
-  );
-}
-
-/* ── views ───────────────────────────────────────────────── */
-
-function Status({ d, hp, rank, apply }) {
-  const cleared = (d.history || []).filter(h => h.cleared).length;
-  return (
-    <>
-      <Panel glow>
-        <Eyebrow>Status</Eyebrow>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
-          <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 15, color: C.text, letterSpacing: '.06em' }}>EXPERIENCE</span>
-          <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 14, color: C.mute }}>{hp.rem} / {hp.need}</span>
-        </div>
-        <Bar value={hp.rem} max={hp.need} color={C.cyan} height={9} />
-        <div style={{ marginTop: 20, display: 'grid', gap: 14 }}>
-          {STATS.map(s => {
-            const p = statP(d.stats[s.k]);
-            const I = s.icon;
-            return (
-              <div key={s.k}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-                  <I size={15} color={s.color} />
-                  <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 13, letterSpacing: '.16em', color: C.text, width: 38 }}>{s.k}</span>
-                  <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 14, color: C.mute, flex: 1 }}>{s.name}</span>
-                  <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 16, color: s.color, fontWeight: 600 }}>{p.lvl}</span>
-                </div>
-                <Bar value={p.rem} max={p.need} color={s.color} />
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-
-      <div style={{ height: 14 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-        {[
-          { l: 'Best streak', v: d.best || 0 },
-          { l: 'Days cleared', v: cleared },
-          { l: 'Quests done', v: d.quests.filter(q => q.done).length },
-        ].map(x => (
-          <Panel key={x.l} pad={13}>
-            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 23, color: C.text }}>{x.v}</div>
-            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11.5, color: C.mute, letterSpacing: '.09em', textTransform: 'uppercase', marginTop: 2 }}>{x.l}</div>
-          </Panel>
-        ))}
-      </div>
-
-      <div style={{ height: 14 }} />
-      <Panel>
-        <Eyebrow>Last 14 days</Eyebrow>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 44 }}>
-          {Array.from({ length: 14 }).map((_, i) => {
-            const h = (d.history || []).slice(-14)[i];
-            const ratio = h && h.total ? h.done / h.total : 0;
-            return (
-              <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                <div style={{
-                  width: '100%', height: `${Math.max(6, ratio * 100)}%`,
-                  background: !h ? 'rgba(255,255,255,.06)' : h.cleared ? C.cyan : C.mute,
-                  boxShadow: h && h.cleared ? `0 0 8px ${C.cyan}` : 'none',
-                }} />
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-
-      <div style={{ height: 14 }} />
-      <Panel pad={14}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer' }}>
-          <input type="checkbox" checked={d.strict} onChange={() => apply(p => ({ ...p, strict: !p.strict }))}
-            style={{ width: 17, height: 17, accentColor: C.red }} />
-          <div>
-            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text }}>Penalty mode</div>
-            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, lineHeight: 1.35 }}>
-              Miss a mandatory quest and lose 40 XP on top of the streak. Off by default — a broken streak is
-              usually feedback enough.
-            </div>
-          </div>
-        </label>
-      </Panel>
-    </>
-  );
-}
-
-function Daily({ d, mandLeft, toggle, add, del, flip }) {
-  const [open, setOpen] = useState(false);
-  const [t, setT] = useState(''); const [s, setS] = useState('STR'); const [m, setM] = useState(false);
-  const submit = () => { if (!t.trim()) return; add(t.trim(), s, m); setT(''); setM(false); setOpen(false); };
-  const doneCount = d.dailies.filter(q => q.done).length;
-
-  return (
-    <>
-      <Panel glow>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <Eyebrow color={mandLeft ? C.red : C.green}>Daily Quest — {mandLeft ? 'Incomplete' : 'Complete'}</Eyebrow>
-            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 19, color: C.text }}>
-              {doneCount} / {d.dailies.length} finished
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute }}>
-            Resets<br />at midnight
-          </div>
-        </div>
-        {mandLeft > 0 && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, color: C.amber, fontFamily: 'Rajdhani, sans-serif', fontSize: 14 }}>
-            <AlertTriangle size={15} />
-            {mandLeft} required quest{mandLeft === 1 ? '' : 's'} left to keep the streak.
-          </div>
-        )}
-      </Panel>
-
-      <div style={{ height: 14 }} />
-      <div style={{ display: 'grid', gap: 9 }}>
-        {d.dailies.map(q => {
-          const st = STAT_MAP[q.stat];
-          const I = st.icon;
-          return (
-            <Panel key={q.id} pad={0}>
-              <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                <button onClick={() => toggle(q.id)} style={{
-                  width: 52, background: q.done ? `${C.cyan}1e` : 'transparent', border: 'none',
-                  cursor: 'pointer', display: 'grid', placeItems: 'center', color: q.done ? C.cyan : C.mute,
-                  boxShadow: `inset -1px 0 0 ${C.lineSoft}`,
-                }}>
-                  <div style={{
-                    width: 21, height: 21, display: 'grid', placeItems: 'center',
-                    boxShadow: `inset 0 0 0 1.5px ${q.done ? C.cyan : 'rgba(255,255,255,.22)'}`,
-                    clipPath: cut(5), background: q.done ? `${C.cyan}33` : 'transparent',
-                  }}>{q.done && <Check size={13} />}</div>
-                </button>
-                <div style={{ flex: 1, padding: '12px 12px', minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: 'Rajdhani, sans-serif', fontSize: 16.5, lineHeight: 1.25,
-                    color: q.done ? C.mute : C.text, textDecoration: q.done ? 'line-through' : 'none',
-                  }}>{q.title}</div>
-                  <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 5 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: st.color, fontFamily: 'Chakra Petch, sans-serif', fontSize: 11, letterSpacing: '.14em' }}>
-                      <I size={11} />{q.stat}
-                    </span>
-                    <button onClick={() => flip(q.id)} style={{
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                      fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.16em',
-                      color: q.mandatory ? C.red : 'rgba(255,255,255,.25)',
-                    }}>{q.mandatory ? '● REQUIRED' : '○ OPTIONAL'}</button>
-                  </div>
-                </div>
-                <button onClick={() => del(q.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.2)', cursor: 'pointer', padding: '0 13px' }}>
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
-
-      <div style={{ height: 13 }} />
-      {!open ? (
-        <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Add a daily quest</Btn>
-      ) : (
-        <Panel glow>
-          <Eyebrow>New daily quest</Eyebrow>
-          <Field value={t} onChange={e => setT(e.target.value)} placeholder="e.g. Drink 8 glasses of water" onKeyDown={e => e.key === 'Enter' && submit()} />
-          <div style={{ height: 11 }} />
-          <StatPicker value={s} onChange={setS} />
-          <div style={{ height: 11 }} />
-          <label style={{ display: 'flex', gap: 9, alignItems: 'center', cursor: 'pointer', fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text }}>
-            <input type="checkbox" checked={m} onChange={() => setM(!m)} style={{ width: 16, height: 16, accentColor: C.red }} />
-            Required — missing it breaks the streak
-          </label>
-          <div style={{ height: 14, }} />
-          <div style={{ display: 'flex', gap: 9 }}>
-            <Btn onClick={submit} disabled={!t.trim()}>Add quest</Btn>
-            <Btn tone="ghost" onClick={() => { setOpen(false); setT(''); }}>Cancel</Btn>
-          </div>
-        </Panel>
-      )}
-    </>
-  );
-}
-
-function StatPicker({ value, onChange }) {
-  return (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-        {STATS.map(s => {
-          const on = value === s.k; const I = s.icon;
-          return (
-            <button key={s.k} onClick={() => onChange(s.k)} style={{
-              background: on ? `${s.color}22` : 'rgba(255,255,255,.04)', border: 'none', cursor: 'pointer',
-              boxShadow: `inset 0 0 0 1px ${on ? s.color + '88' : 'rgba(255,255,255,.07)'}`,
-              clipPath: cut(6), padding: '9px 0', color: on ? s.color : C.mute,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            }}>
-              <I size={15} />
-              <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.1em' }}>{s.k}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, marginTop: 7, lineHeight: 1.35 }}>
-        {STAT_MAP[value].name} — {STAT_MAP[value].hint}
-      </div>
-    </>
-  );
-}
-
-function Quests({ d, add, del, finish, stepFlip, addStep }) {
-  const [open, setOpen] = useState(false);
-  const [t, setT] = useState(''); const [s, setS] = useState('INT'); const [r, setR] = useState('C'); const [due, setDue] = useState('');
-  const [expand, setExpand] = useState(null);
-  const [stepTxt, setStepTxt] = useState('');
-
-  const submit = () => {
-    if (!t.trim()) return;
-    add({ id: uid(), title: t.trim(), stat: s, rank: r, due, steps: [], done: false });
-    setT(''); setDue(''); setOpen(false);
-  };
-  const active = d.quests.filter(q => !q.done);
-  const done = d.quests.filter(q => q.done);
-
-  const card = q => {
-    const st = STAT_MAP[q.stat]; const I = st.icon; const rw = DIFF[q.rank];
-    const rc = (RANKS.find(x => x.r === q.rank) || {}).c || C.cyan;
-    const ex = expand === q.id;
-    const stepsDone = q.steps.filter(x => x.done).length;
-    return (
-      <Panel key={q.id} pad={14} style={{ opacity: q.done ? .45 : 1 }}>
-        <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-          <div style={{
-            width: 31, height: 31, flexShrink: 0, display: 'grid', placeItems: 'center',
-            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
-            background: `${rc}22`, color: rc, fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 14,
-          }}>{q.rank}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.text, lineHeight: 1.25 }}>{q.title}</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5, fontFamily: 'Chakra Petch, sans-serif', fontSize: 10.5, letterSpacing: '.11em' }}>
-              <span style={{ color: st.color, display: 'inline-flex', gap: 4, alignItems: 'center' }}><I size={11} />{q.stat}</span>
-              <span style={{ color: C.amber }}>+{rw.xp} XP · +{rw.p} PTS</span>
-              {q.due && <span style={{ color: C.mute }}>BY {q.due}</span>}
-              {q.steps.length > 0 && <span style={{ color: C.mute }}>{stepsDone}/{q.steps.length} STEPS</span>}
-            </div>
-          </div>
-          <button onClick={() => setExpand(ex ? null : q.id)} style={{ background: 'none', border: 'none', color: C.mute, cursor: 'pointer', padding: 2 }}>
-            <ChevronDown size={17} style={{ transform: ex ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-          </button>
-        </div>
-
-        {ex && (
-          <div style={{ marginTop: 13, paddingTop: 13, boxShadow: `inset 0 1px 0 ${C.lineSoft}` }}>
-            {q.steps.map((s2, i) => (
-              <button key={i} onClick={() => stepFlip(q.id, i)} style={{
-                display: 'flex', gap: 9, alignItems: 'center', width: '100%', background: 'none',
-                border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left',
-              }}>
-                <div style={{
-                  width: 15, height: 15, flexShrink: 0, display: 'grid', placeItems: 'center', clipPath: cut(4),
-                  boxShadow: `inset 0 0 0 1.5px ${s2.done ? C.cyan : 'rgba(255,255,255,.22)'}`,
-                  background: s2.done ? `${C.cyan}33` : 'transparent', color: C.cyan,
-                }}>{s2.done && <Check size={10} />}</div>
-                <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: s2.done ? C.mute : C.text, textDecoration: s2.done ? 'line-through' : 'none' }}>{s2.t}</span>
-              </button>
-            ))}
-            {!q.done && (
-              <>
-                <div style={{ display: 'flex', gap: 7, marginTop: 9 }}>
-                  <Field value={stepTxt} onChange={e => setStepTxt(e.target.value)} placeholder="Add a step"
-                    onKeyDown={e => { if (e.key === 'Enter' && stepTxt.trim()) { addStep(q.id, stepTxt.trim()); setStepTxt(''); } }} />
-                  <Btn small tone="ghost" onClick={() => { if (stepTxt.trim()) { addStep(q.id, stepTxt.trim()); setStepTxt(''); } }}><Plus size={14} /></Btn>
-                </div>
-                <div style={{ display: 'flex', gap: 9, marginTop: 13 }}>
-                  <Btn small tone="gold" onClick={() => finish(q.id)}><Trophy size={14} />Complete</Btn>
-                  <Btn small tone="ghost" onClick={() => del(q.id)}><Trash2 size={14} />Delete</Btn>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </Panel>
-    );
-  };
-
-  return (
-    <>
-      <Panel glow>
-        <Eyebrow>Quests</Eyebrow>
-        <p style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15.5, color: C.mute, margin: 0, lineHeight: 1.45 }}>
-          Bigger objectives with a deadline. Set the rank honestly — an S-rank should scare you a little.
-        </p>
-      </Panel>
-      <div style={{ height: 13 }} />
-      <div style={{ display: 'grid', gap: 9 }}>{active.map(card)}</div>
-      {active.length === 0 && (
-        <Panel pad={22}>
-          <div style={{ textAlign: 'center', fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15.5 }}>
-            No active quests. Name the thing you keep putting off.
-          </div>
-        </Panel>
-      )}
-
-      <div style={{ height: 13 }} />
-      {!open ? (
-        <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Accept a new quest</Btn>
-      ) : (
-        <Panel glow>
-          <Eyebrow>New quest</Eyebrow>
-          <Field value={t} onChange={e => setT(e.target.value)} placeholder="e.g. Save 3 months of expenses" />
-          <div style={{ height: 11 }} />
-          <StatPicker value={s} onChange={setS} />
-          <div style={{ height: 13 }} />
-          <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.28em', color: C.cyan, marginBottom: 7 }}>DIFFICULTY</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
-            {['E', 'D', 'C', 'B', 'A', 'S'].map(x => {
-              const on = r === x; const rc = (RANKS.find(y => y.r === x) || {}).c;
-              return (
-                <button key={x} onClick={() => setR(x)} style={{
-                  background: on ? `${rc}25` : 'rgba(255,255,255,.04)', border: 'none', cursor: 'pointer',
-                  boxShadow: `inset 0 0 0 1px ${on ? rc + '88' : 'rgba(255,255,255,.07)'}`, clipPath: cut(6),
-                  padding: '10px 0', color: on ? rc : C.mute, fontFamily: 'Chakra Petch, sans-serif', fontSize: 15, fontWeight: 600,
-                }}>{x}</button>
-              );
-            })}
-          </div>
-          <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: C.mute, marginTop: 7 }}>
-            Reward: +{DIFF[r].xp} XP and +{DIFF[r].p} points
-          </div>
-          <div style={{ height: 13 }} />
-          <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10, letterSpacing: '.28em', color: C.cyan, marginBottom: 7 }}>DEADLINE (OPTIONAL)</div>
-          <Field type="date" value={due} onChange={e => setDue(e.target.value)} />
-          <div style={{ height: 14 }} />
-          <div style={{ display: 'flex', gap: 9 }}>
-            <Btn onClick={submit} disabled={!t.trim()}>Accept</Btn>
-            <Btn tone="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
-          </div>
-        </Panel>
-      )}
-
-      {done.length > 0 && (
-        <>
-          <div style={{ height: 20 }} />
-          <Eyebrow color={C.mute}>Cleared</Eyebrow>
-          <div style={{ display: 'grid', gap: 9 }}>{done.map(card)}</div>
-        </>
-      )}
-    </>
-  );
-}
-
-function Shop({ d, buy, addReward, delReward }) {
-  const [mode, setMode] = useState('rewards');
-  const [open, setOpen] = useState(false);
-  const [n, setN] = useState(''); const [c, setC] = useState(''); const [note, setNote] = useState('');
-  const submit = () => {
-    const cost = parseInt(c, 10);
-    if (!n.trim() || !cost || cost < 1) return;
-    addReward(n.trim(), cost, note.trim()); setN(''); setC(''); setNote(''); setOpen(false);
-  };
-
-  return (
-    <>
-      <Panel glow>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <Eyebrow color={C.amber}>Shop</Eyebrow>
-            <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 21, color: C.amber }}>{d.points.toLocaleString()} points</div>
-          </div>
-          <Coins size={28} color={C.amber} style={{ opacity: .5 }} />
-        </div>
-      </Panel>
-      <div style={{ height: 13 }} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Btn small wide tone={mode === 'rewards' ? 'cyan' : 'ghost'} onClick={() => setMode('rewards')}>Your rewards</Btn>
-        <Btn small wide tone={mode === 'medals' ? 'cyan' : 'ghost'} onClick={() => setMode('medals')}>Medals</Btn>
-      </div>
-      <div style={{ height: 13 }} />
-
-      {mode === 'rewards' && (
-        <>
-          <div style={{ display: 'grid', gap: 9 }}>
-            {d.shop.map(it => {
-              const can = d.points >= it.cost;
-              return (
-                <Panel key={it.id} pad={14}>
-                  <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.text, lineHeight: 1.25 }}>{it.name}</div>
-                      {it.note && <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13.5, color: C.mute, marginTop: 3 }}>{it.note}</div>}
-                      <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 12, color: C.amber, marginTop: 5, letterSpacing: '.1em' }}>{it.cost} PTS</div>
-                    </div>
-                    <Btn small tone={can ? 'gold' : 'ghost'} disabled={!can} onClick={() => buy(it)}>
-                      {can ? 'Buy' : <Lock size={13} />}
-                    </Btn>
-                    <button onClick={() => delReward(it.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.18)', cursor: 'pointer' }}>
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </Panel>
-              );
-            })}
-          </div>
-          <div style={{ height: 13 }} />
-          {!open ? (
-            <Btn wide tone="ghost" onClick={() => setOpen(true)}><Plus size={15} />Add a reward</Btn>
-          ) : (
-            <Panel glow>
-              <Eyebrow>New reward</Eyebrow>
-              <Field value={n} onChange={e => setN(e.target.value)} placeholder="What do you actually want?" />
-              <div style={{ height: 10 }} />
-              <Field value={c} onChange={e => setC(e.target.value.replace(/\D/g, ''))} placeholder="Cost in points" inputMode="numeric" />
-              <div style={{ height: 10 }} />
-              <Field value={note} onChange={e => setNote(e.target.value)} placeholder="Any rules for it (optional)" />
-              <div style={{ height: 14 }} />
-              <div style={{ display: 'flex', gap: 9 }}>
-                <Btn onClick={submit} disabled={!n.trim() || !c}>Add to shop</Btn>
-                <Btn tone="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
-              </div>
-            </Panel>
-          )}
-        </>
-      )}
-
-      {mode === 'medals' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
-          {MEDALS.map(m => {
-            const can = d.points >= m.cost;
-            const owned = d.bag.filter(b => b.refId === m.id).length;
-            return (
-              <Panel key={m.id} pad={13}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 27, color: m.color, lineHeight: 1, textShadow: `0 0 14px ${m.color}88` }}>{m.sym}</div>
-                  {owned > 0 && <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 11, color: C.mute }}>×{owned}</div>}
-                </div>
-                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 15, color: C.text, marginTop: 8, lineHeight: 1.2 }}>{m.name}</div>
-                <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 9.5, letterSpacing: '.18em', color: m.color, marginTop: 3, opacity: .8 }}>{m.tier.toUpperCase()}</div>
-                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 12.5, color: C.mute, marginTop: 6, lineHeight: 1.3, minHeight: 32 }}>{m.desc}</div>
-                <div style={{ height: 9 }} />
-                <Btn small wide tone={can ? 'gold' : 'ghost'} disabled={!can} onClick={() => buy(m)}>
-                  {can ? `${m.cost} pts` : <><Lock size={12} />{m.cost}</>}
-                </Btn>
-              </Panel>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-}
-
-function Bag({ d, useItem, sellItem }) {
-  const medals = d.bag.filter(b => b.kind === 'medal');
-  const rewards = d.bag.filter(b => b.kind === 'reward');
-  return (
-    <>
-      <Panel glow>
-        <Eyebrow>Inventory</Eyebrow>
-        <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 19, color: C.text }}>
-          {medals.length} medal{medals.length === 1 ? '' : 's'} · {rewards.filter(r => !r.used).length} unclaimed reward{rewards.filter(r => !r.used).length === 1 ? '' : 's'}
-        </div>
-      </Panel>
-
-      <div style={{ height: 14 }} />
-      <Eyebrow color={C.mute}>Rewards</Eyebrow>
-      <div style={{ display: 'grid', gap: 9 }}>
-        {rewards.length === 0 && <Panel pad={18}><div style={{ fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15, textAlign: 'center' }}>Nothing bought yet. Points are no good sitting there.</div></Panel>}
-        {rewards.map(b => (
-          <Panel key={b.uid} pad={13} style={{ opacity: b.used ? .45 : 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 16, color: C.text }}>{b.name}</div>
-                <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 10.5, letterSpacing: '.12em', color: C.mute, marginTop: 3 }}>
-                  {b.used ? 'CLAIMED' : `BOUGHT ${b.at}`}
-                </div>
-              </div>
-              {!b.used && <Btn small onClick={() => useItem(b.uid)}>Claim it</Btn>}
-              {!b.used && <Btn small tone="ghost" onClick={() => sellItem(b.uid)} title="Refund half">Sell</Btn>}
-            </div>
-          </Panel>
-        ))}
-      </div>
-
-      <div style={{ height: 18 }} />
-      <Eyebrow color={C.mute}>Medal case</Eyebrow>
-      {medals.length === 0 ? (
-        <Panel pad={18}><div style={{ fontFamily: 'Rajdhani, sans-serif', color: C.mute, fontSize: 15, textAlign: 'center' }}>Empty case.</div></Panel>
-      ) : (
-        <Panel pad={16}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(72px,1fr))', gap: 12 }}>
-            {medals.map(b => (
-              <button key={b.uid} onClick={() => sellItem(b.uid)} title={`${b.name} — tap to sell for ${Math.floor(b.cost / 2)} pts`}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'center' }}>
-                <div style={{ fontSize: 31, color: b.color, textShadow: `0 0 16px ${b.color}99`, lineHeight: 1 }}>{b.sym}</div>
-                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11.5, color: C.mute, marginTop: 5, lineHeight: 1.2 }}>{b.name}</div>
-              </button>
-            ))}
-          </div>
-        </Panel>
-      )}
-    </>
-  );
-}
-
-/* ── the level-up window ─────────────────────────────────── */
-function SystemWindow({ m, onClose }) {
-  const isLevel = m.kind === 'level';
-  const accent = isLevel ? C.cyan : m.stat.color;
-  return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(2,4,10,.86)',
-      display: 'grid', placeItems: 'center', padding: 22, cursor: 'pointer',
-    }}>
-      <div className="sysopen" style={{ width: '100%', maxWidth: 380 }}>
-        <div style={{
-          background: 'rgba(8,17,36,.97)', padding: 30, clipPath: cut(20), textAlign: 'center',
-          boxShadow: `inset 0 0 0 1px ${accent}88, 0 0 60px ${accent}33`,
-        }}>
-          <div style={{ fontFamily: 'Chakra Petch, monospace', fontSize: 10.5, letterSpacing: '.42em', color: accent, opacity: .9 }}>NOTIFICATION</div>
-          <div style={{ height: 18 }} />
-          {isLevel ? (
-            <>
-              <div style={{
-                fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 34, color: '#fff',
-                letterSpacing: '.06em', textShadow: `0 0 26px ${accent}`,
-              }}>LEVEL UP</div>
-              <div style={{ height: 14 }} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 27, color: C.mute }}>{m.from}</span>
-                <span style={{ color: accent, fontSize: 20 }}>▶</span>
-                <span style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 40, color: accent, textShadow: `0 0 20px ${accent}` }}>{m.to}</span>
-              </div>
-              {m.rankUp && (
-                <div style={{ marginTop: 20, paddingTop: 16, boxShadow: `inset 0 1px 0 ${C.lineSoft}`, fontFamily: 'Rajdhani, sans-serif', fontSize: 17, color: C.amber }}>
-                  You have advanced to <strong>Rank {m.rankUp}</strong>.
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontWeight: 700, fontSize: 25, color: '#fff', letterSpacing: '.04em' }}>
-                {m.stat.name.toUpperCase()} +{m.to - m.from}
-              </div>
-              <div style={{ height: 12 }} />
-              <div style={{ fontFamily: 'Chakra Petch, sans-serif', fontSize: 34, color: accent, textShadow: `0 0 20px ${accent}` }}>
-                {m.stat.k} {m.to}
-              </div>
-            </>
-          )}
-          <div style={{ height: 26 }} />
-          <Btn wide onClick={onClose}>Confirm</Btn>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Boot() {
-  return (
-    <Frame>
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <div style={{ fontFamily: 'Chakra Petch, monospace', fontSize: 12, letterSpacing: '.4em', color: C.cyan, opacity: .7 }}>
-          CONNECTING TO THE SYSTEM
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-/* ── page shell + global style ───────────────────────────── */
-function Frame({ children }) {
-  return (
-    <div style={{
-      minHeight: '100vh', background: `radial-gradient(120% 80% at 50% 0%, #0b1730 0%, ${C.void} 62%)`,
-      color: C.text, fontFamily: 'Rajdhani, system-ui, sans-serif', position: 'relative', overflowX: 'hidden',
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        button:focus-visible, input:focus-visible { outline: 2px solid ${C.cyan}; outline-offset: 2px; }
-        .grid-bg {
-          position: fixed; inset: 0; pointer-events: none; opacity: .35;
-          background-image:
-            linear-gradient(${C.lineSoft} 1px, transparent 1px),
-            linear-gradient(90deg, ${C.lineSoft} 1px, transparent 1px);
-          background-size: 46px 46px;
-          mask-image: radial-gradient(90% 60% at 50% 0%, #000 0%, transparent 75%);
-          -webkit-mask-image: radial-gradient(90% 60% at 50% 0%, #000 0%, transparent 75%);
+  if(act==='openquest'){ UI.qOpen=true; UI.qStat=UI.qStat||'INT'; UI.qRank=UI.qRank||'C'; render(); return; }
+  if(act==='cancelquest'){ UI.qOpen=false; UI.qTitle=''; UI.qDue=''; render(); return; }
+  if(act==='addquest'){
+    var qt=(UI.qTitle||'').trim(); if(!qt){ toast('Give the quest a name.',true); return; }
+    var qs=UI.qStat||'INT', qr=UI.qRank||'C', qd=UI.qDue||'';
+    UI.qOpen=false; UI.qTitle=''; UI.qDue='';
+    apply(function(d){ d.quests.push({id:uid(),title:qt,stat:qs,rank:qr,due:qd,steps:[],done:false}); }); return;
+  }
+  if(act==='expand'){ UI.expand=UI.expand===id?null:id; UI.stepTxt=''; render(); return; }
+  if(act==='step'){
+    var idx=parseInt(el.getAttribute('data-i'),10);
+    apply(function(d){ d.quests.forEach(function(q){ if(q.id===id) q.steps[idx].done=!q.steps[idx].done; }); }); return;
+  }
+  if(act==='addstep'){
+    var s=(UI.stepTxt||'').trim(); if(!s) return; UI.stepTxt='';
+    apply(function(d){ d.quests.forEach(function(q){ if(q.id===id) q.steps.push({t:s,done:false}); }); }); return;
+  }
+  if(act==='delquest'){ apply(function(d){ d.quests=d.quests.filter(function(q){return q.id!==id;}); }); return; }
+  if(act==='finish'){
+    apply(function(d){
+      d.quests.forEach(function(q){
+        if(q.id===id&&!q.done){
+          var r=DIFF[q.rank];
+          d.xp+=r.xp; d.points+=r.p; d.stats[q.stat]+=r.xp;
+          q.done=true; q.doneAt=today();
+          toast('Quest complete. +'+r.xp+' XP  +'+r.p+' pts');
         }
-        @keyframes sysopen {
-          from { opacity: 0; transform: translateY(10px) scale(.965); }
-          to   { opacity: 1; transform: none; }
-        }
-        .sysopen { animation: sysopen .3s cubic-bezier(.2,.9,.25,1) both; }
-        @media (prefers-reduced-motion: reduce) {
-          .sysopen { animation: none; }
-          .sysbar { transition: none !important; }
-        }
-      `}</style>
-      <div className="grid-bg" />
-      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
-    </div>
-  );
+      });
+    }); return;
+  }
+
+  if(act==='shoptab'){ UI.shopTab=v; render(); return; }
+  if(act==='openreward'){ UI.rOpen=true; render(); return; }
+  if(act==='cancelreward'){ UI.rOpen=false; UI.rName=''; UI.rCost=''; UI.rNote=''; render(); return; }
+  if(act==='addreward'){
+    var rn=(UI.rName||'').trim(), rc=parseInt(UI.rCost,10);
+    if(!rn||!rc||rc<1){ toast('Needs a name and a point cost.',true); return; }
+    var rnote=(UI.rNote||'').trim();
+    UI.rOpen=false; UI.rName=''; UI.rCost=''; UI.rNote='';
+    apply(function(d){ d.shop.push({id:uid(),name:rn,cost:rc,note:rnote}); }); return;
+  }
+  if(act==='delreward'){ apply(function(d){ d.shop=d.shop.filter(function(x){return x.id!==id;}); }); return; }
+  if(act==='buyreward'||act==='buymedal'){
+    var isMedal=act==='buymedal';
+    apply(function(d){
+      var it=isMedal?MEDAL_MAP[id]:null;
+      if(!isMedal) d.shop.forEach(function(x){ if(x.id===id) it=x; });
+      if(!it||d.points<it.cost) return;
+      d.points-=it.cost;
+      d.bag.push({uid:uid(),refId:it.id,name:it.name,cost:it.cost,
+        sym:isMedal?it.sym:null,color:isMedal?it.color:'#4dd0ff',
+        kind:isMedal?'medal':'reward',at:today(),used:false});
+      toast('Acquired: '+it.name);
+    }); return;
+  }
+  if(act==='claim'){ apply(function(d){ d.bag.forEach(function(b){ if(b.uid===u) b.used=true; }); }); return; }
+  if(act==='sell'){
+    apply(function(d){
+      var it=null; d.bag.forEach(function(b){ if(b.uid===u) it=b; });
+      if(!it) return;
+      var back=Math.floor(it.cost/2);
+      d.points+=back; d.bag=d.bag.filter(function(b){return b.uid!==u;});
+      toast('Sold. +'+back+' pts');
+    }); return;
+  }
+  if(act==='reset'){
+    if(confirm('Erase everything and start over? This cannot be undone.')){
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      D=fresh(); UI={}; TAB='status'; render();
+    }
+    return;
+  }
 }
+
+/* ─── wiring ───────────────────────────────────────────── */
+document.addEventListener('click',function(e){
+  var m=document.getElementById('modal');
+  if(MODAL&&e.target===m){ popModal(); return; }
+  var el=e.target.closest?e.target.closest('[data-act]'):null;
+  if(!el||el.disabled) return;
+  handle(el.getAttribute('data-act'),el);
+});
+document.addEventListener('input',function(e){
+  var el=e.target, key=el.getAttribute&&el.getAttribute('data-ui');
+  if(!key) return;
+  if(el.type==='checkbox'){ UI[key]=el.checked; return; }
+  if(key==='rCost') el.value=el.value.replace(/\D/g,'');
+  UI[key]=el.value;
+});
+document.addEventListener('change',function(e){
+  var el=e.target;
+  if(el.getAttribute&&el.getAttribute('data-act')==='strict'){
+    apply(function(d){ d.strict=el.checked; });
+  }
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&MODAL){ popModal(); return; }
+  if(e.key!=='Enter') return;
+  var el=e.target, key=el.getAttribute&&el.getAttribute('data-ui');
+  if(!key) return;
+  e.preventDefault();
+  var map={oName:'accept',dTitle:'adddaily',qTitle:'addquest',rName:'addreward',rCost:'addreward',rNote:'addreward'};
+  if(key==='stepTxt'){
+    var btn=document.querySelector('[data-act="addstep"]');
+    if(btn) handle('addstep',btn);
+    return;
+  }
+  if(map[key]){
+    var b=document.querySelector('[data-act="'+map[key]+'"]');
+    if(b) handle(map[key],b);
+  }
+});
+document.addEventListener('focusin',function(e){
+  var k=e.target.getAttribute&&e.target.getAttribute('data-ui');
+  if(k) FOCUS=k;
+});
+
+// midnight rollover while the page is open
+setInterval(function(){
+  if(D&&D.lastReset!==today()){ rollover(D); save(); render(); }
+},60000);
+
+load(); render();
+})();
+</script>
+</body>
+</html>
